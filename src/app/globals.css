@@ -628,7 +628,7 @@ button {
   align-items: center;
   gap: 28px;
   white-space: nowrap;
-  animation: ticker-scroll 86s linear infinite;
+  animation: ticker-scroll 140s linear infinite;
 }
 
 .ticker-item {

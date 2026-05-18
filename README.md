@@ -10,7 +10,7 @@ RiskMap Analyzer is a full-screen command-center map built with Next.js, Leaflet
 
 - Dark CartoDB Leaflet world map with Natural Earth country polygons from `world-atlas`.
 - Toggleable threat, outbreak, Interpol, cyber, density, and threat-corridor layers.
-- Live cyber attack sources, attack arcs, heat trails, replay controls, and a bottom threat ticker.
+- Live cyber attack sources, attack arcs, heat trails, replay controls, and a deliberately slow bottom threat ticker for readable incident scanning.
 - Country dossier with flag, population, density, outbreak sparkline, cyber/Interpol counts, adjacent borders, lockdown simulator, and computed risk score.
 - DEFCON HUD, source confidence badges, command search palette, night-vision mode, red-alert mode, satellite zoom flash, and two-country risk battle mode.
 - Cached Next.js route handlers for REST Countries, WHO outbreak reports, GDELT, SANS ISC/DShield, CISA KEV, and Interpol Red Notices.
@@ -51,7 +51,7 @@ npm run test:e2e
 npm audit --audit-level=moderate
 ```
 
-The e2e test starts the dev server on `127.0.0.1:3137` and verifies the map, HUD, ticker, layer toggle, and intel-card interaction in Chromium.
+The e2e test starts the dev server on `127.0.0.1:3137` and verifies the map, HUD, slower ticker, command search, layer toggles, cyber arcs, heat trails, and intel-card interaction in Chromium.
 
 ## Deploy
 
