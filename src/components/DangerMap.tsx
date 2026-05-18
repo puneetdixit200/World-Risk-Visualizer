@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import L, { type Layer, type LeafletMouseEvent, type PathOptions } from "leaflet";
-import { GitBranch } from "lucide-react";
 import { CircleMarker, GeoJSON, MapContainer, Polyline, Popup, TileLayer } from "react-leaflet";
 import { feature } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
@@ -882,8 +881,10 @@ export function DangerMap() {
         rel="noreferrer"
         target="_blank"
       >
-        <GitBranch size={18} strokeWidth={2.1} aria-hidden="true" />
-        <span>@puneetdixit200</span>
+        <span className="signature-muted">Made with</span>
+        <span className="signature-heart" aria-hidden="true">♥</span>
+        <span className="signature-muted">by</span>
+        <span className="signature-name">PUNEET DIXIT</span>
       </a>
       <div className={`static-flash ${satelliteFlash ? "active" : ""}`} aria-hidden="true" />
       {!hasData || loadError ? (

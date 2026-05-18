@@ -25,6 +25,8 @@ test("renders the command center map and interactive controls", async ({ page })
     "href",
     "https://github.com/puneetdixit200",
   );
+  await expect(page.getByText("Made with")).toBeVisible();
+  await expect(page.getByText("PUNEET DIXIT")).toBeVisible();
 
   const zoomBox = await page.getByLabel("Map zoom controls").boundingBox();
   expect(zoomBox?.x).toBeGreaterThan(420);
@@ -32,7 +34,8 @@ test("renders the command center map and interactive controls", async ({ page })
 
   const githubBox = await page.getByRole("link", { name: "Open Puneet Dixit's GitHub profile" }).boundingBox();
   const tickerBox = await page.locator(".ticker").boundingBox();
-  expect(githubBox?.x).toBeGreaterThan(1060);
+  expect(githubBox?.x).toBeGreaterThan(1000);
+  expect((githubBox?.x ?? 0) + (githubBox?.width ?? 0)).toBeLessThan(1275);
   expect(githubBox?.y).toBeLessThan((tickerBox?.y ?? 0) - 8);
 
   const beforeDrag = await page.getByLabel("Layer controls").boundingBox();
