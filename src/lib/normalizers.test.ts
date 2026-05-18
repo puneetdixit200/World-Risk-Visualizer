@@ -6,6 +6,7 @@ import {
   normalizeCyberFeed,
   normalizeDisease,
   normalizeOutbreakDisease,
+  parseDshieldTopSourcesHtml,
 } from "./normalizers";
 
 describe("normalizers", () => {
@@ -163,6 +164,18 @@ describe("normalizers", () => {
         latlng: [47, 8],
         region: "Europe",
       },
+      {
+        name: { common: "Netherlands", official: "Kingdom of the Netherlands" },
+        cca2: "NL",
+        cca3: "NLD",
+        ccn3: "528",
+        population: 17_800_000,
+        area: 41_850,
+        borders: [],
+        flags: { svg: "https://flagcdn.com/nl.svg" },
+        latlng: [52.5, 5.75],
+        region: "Europe",
+      },
     ]);
 
     const feed = normalizeCyberFeed(
@@ -197,11 +210,40 @@ describe("normalizers", () => {
         ],
       },
       countries,
+      [
+        {
+          ip: "89.248.163.200",
+          attacks: 9396,
+          count: 364709,
+          firstseen: "2022-09-21",
+          lastseen: "2026-05-18",
+        },
+      ],
+      [
+        {
+          ip: "89.248.163.200",
+          country: "NL",
+          asn: {
+            number: 202425,
+            organization: "IP Volume inc",
+          },
+        },
+      ],
     );
 
+    expect(feed.counts.NLD).toBe(1);
+    expect(feed.incidents[0]).toMatchObject({
+      kind: "CYBER",
+      countryCode: "NLD",
+      country: "Netherlands",
+      source: "SANS ISC/DShield",
+      ip: "89.248.163.200",
+      attacks: 9396,
+      reports: 364709,
+    });
     expect(feed.counts.CHE).toBe(1);
     expect(feed.counts.USA).toBe(1);
-    expect(feed.incidents[0]).toMatchObject({
+    expect(feed.incidents[1]).toMatchObject({
       kind: "CYBER",
       countryCode: "CHE",
       country: "Switzerland",
@@ -214,5 +256,23 @@ describe("normalizers", () => {
       vendor: "Microsoft",
       product: "Windows",
     });
+  });
+
+  it("parses SANS DShield top source rows into attack sources and country lookups", () => {
+    const parsed = parseDshieldTopSourcesHtml(`
+      <tr>
+        <td><a href="/ipdetails.html?ip=89.248.163.200">89.248.163.200</a><br/> (NL)</td><td>recyber.net</td><td>364,709</td>
+        <td>9,396</td><td><a href="date.html?date=2022-09-21">2022-09-21</a></td>
+        <td><a href="date.html?date=2026-05-18">2026-05-18</a></td></tr>
+    `);
+
+    expect(parsed.sources[0]).toMatchObject({
+      ip: "89.248.163.200",
+      attacks: "9,396",
+      count: "364,709",
+      firstseen: "2022-09-21",
+      lastseen: "2026-05-18",
+    });
+    expect(parsed.lookups[0]).toEqual({ ip: "89.248.163.200", country: "NL" });
   });
 });

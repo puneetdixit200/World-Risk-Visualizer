@@ -1,18 +1,28 @@
-import { get } from "node:https";
+import { request as httpsRequest } from "node:https";
 import { URL } from "node:url";
 
 const MAX_RESPONSE_BYTES = 2_000_000;
 
-export function fetchJsonWithNodeHttps<T>(url: string, timeoutMs: number): Promise<T> {
+type JsonRequestOptions = {
+  method?: "GET" | "POST";
+  body?: unknown;
+  headers?: Record<string, string>;
+};
+
+export function fetchJsonWithNodeHttps<T>(url: string, timeoutMs: number, options: JsonRequestOptions = {}): Promise<T> {
   return new Promise((resolve, reject) => {
     let settled = false;
+    const body = options.body === undefined ? undefined : JSON.stringify(options.body);
 
-    const request = get(
+    const request = httpsRequest(
       new URL(url),
       {
+        method: options.method ?? "GET",
         headers: {
           accept: "application/json",
-          "user-agent": "world-risk-visualizer/1.0",
+          "user-agent": "world-risk-visualizer/1.0 (github.com/puneetdixit200)",
+          ...(body ? { "content-type": "application/json", "content-length": Buffer.byteLength(body).toString() } : {}),
+          ...options.headers,
         },
       },
       (response) => {
@@ -66,5 +76,11 @@ export function fetchJsonWithNodeHttps<T>(url: string, timeoutMs: number): Promi
         reject(error);
       }
     });
+
+    if (body) {
+      request.write(body);
+    }
+
+    request.end();
   });
 }

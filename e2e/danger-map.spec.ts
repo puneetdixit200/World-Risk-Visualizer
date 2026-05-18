@@ -3,6 +3,8 @@ import { expect, test } from "@playwright/test";
 test("renders the command center map and interactive controls", async ({ page }) => {
   await page.goto("/");
 
+  await expect(page).toHaveTitle("RiskMap Analyzer");
+  await expect(page.locator('link[rel~="icon"]').first()).toHaveAttribute("href", "/favicon.svg");
   await expect(page.getByLabel("Layer controls")).toBeVisible();
   await expect(page.getByLabel("Global risk stats")).toBeVisible();
   await expect(page.getByText("GLOBAL DEFCON")).toBeVisible();

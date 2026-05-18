@@ -33,7 +33,7 @@ export function LayerTogglePanel({ layers, nightVision, onToggle, onNightVisionT
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <p className="hud-title text-sm">DANGER MAP</p>
+          <p className="hud-title text-sm">RISKMAP ANALYZER</p>
           <p className="data-font text-[10px] uppercase text-[#7a8da0]">Layer Matrix</p>
         </div>
         <button

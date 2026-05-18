@@ -62,6 +62,28 @@ export type RawCisaKevCatalog = {
   vulnerabilities?: JsonRecord[];
 };
 
+export type RawDshieldAttackSource = {
+  ip?: string;
+  attacks?: number | string;
+  count?: number | string;
+  firstseen?: string;
+  lastseen?: string;
+};
+
+export type RawIpCountryLookup = {
+  ip?: string;
+  country?: string;
+  asn?: {
+    number?: number | string;
+    organization?: string;
+  };
+};
+
+export type ParsedDshieldSources = {
+  sources: RawDshieldAttackSource[];
+  lookups: RawIpCountryLookup[];
+};
+
 export function normalizeCountries(rawCountries: RestCountryRecord[]) {
   return rawCountries.reduce<Record<string, CountryIntel>>((countries, raw) => {
     if (!raw.cca3 || !raw.name?.common) {
@@ -164,6 +186,55 @@ function createCountryNameLookup(countries: Record<string, CountryIntel>) {
   ]);
 
   return new Map(entries);
+}
+
+function createCountryCodeLookup(countries: Record<string, CountryIntel>) {
+  return new Map(
+    Object.values(countries)
+      .filter((country) => country.cca2)
+      .map((country) => [country.cca2.toUpperCase(), country] as const),
+  );
+}
+
+function getNumber(value: unknown, fallback = 0) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(/,/g, ""));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  return fallback;
+}
+
+export function parseDshieldTopSourcesHtml(html: string): ParsedDshieldSources {
+  const sources: RawDshieldAttackSource[] = [];
+  const lookups: RawIpCountryLookup[] = [];
+  const rowPattern =
+    /<tr>\s*<td><a[^>]*>([0-9a-fA-F:.]+)<\/a><br\/>\s*\(([A-Z]{2})\)<\/td><td>[\s\S]*?<\/td><td>([\d,]+)<\/td>\s*<td>([\d,]+)<\/td><td><a[^>]*>(\d{4}-\d{2}-\d{2})<\/a><\/td>\s*<td><a[^>]*>(\d{4}-\d{2}-\d{2})<\/a><\/td><\/tr>/g;
+  let row = rowPattern.exec(html);
+
+  while (row) {
+    const [, ip, country, reports, attacks, firstseen, lastseen] = row;
+
+    sources.push({
+      ip,
+      attacks,
+      count: reports,
+      firstseen,
+      lastseen,
+    });
+    lookups.push({
+      ip,
+      country,
+    });
+
+    row = rowPattern.exec(html);
+  }
+
+  return { sources, lookups };
 }
 
 function inferDiseaseName(title: string) {
@@ -361,11 +432,53 @@ export function normalizeCyberFeed(
   rawArticles: JsonRecord[],
   rawKev: RawCisaKevCatalog,
   countries: Record<string, CountryIntel>,
+  rawDshieldSources: RawDshieldAttackSource[] = [],
+  rawIpCountryLookups: RawIpCountryLookup[] = [],
 ): CyberFeed {
   const lookup = createCountryNameLookup(countries);
+  const countryByIso2 = createCountryCodeLookup(countries);
+  const ipCountryByIp = new Map(
+    rawIpCountryLookups
+      .filter((detail) => detail.ip)
+      .map((detail) => [detail.ip as string, detail] as const),
+  );
   const counts: Record<string, number> = {};
   const seenUrls = new Set<string>();
   const incidents: CyberIncident[] = [];
+
+  rawDshieldSources.forEach((raw) => {
+    const ip = getOptionalString(raw.ip);
+    const detail = ip ? ipCountryByIp.get(ip) : undefined;
+    const country = detail?.country ? countryByIso2.get(detail.country.toUpperCase()) : undefined;
+
+    if (!ip || !country) {
+      return;
+    }
+
+    const attacks = getNumber(raw.attacks);
+    const reports = getNumber(raw.count);
+    const asn = detail?.asn?.number ? `AS${detail.asn.number}` : undefined;
+    const asName = getOptionalString(detail?.asn?.organization);
+    const targetText = attacks ? `${attacks.toLocaleString("en-US")} targets` : "reported targets";
+    const reportText = reports ? `${reports.toLocaleString("en-US")} sensor reports` : "sensor reports";
+
+    counts[country.cca3] = (counts[country.cca3] ?? 0) + 1;
+    incidents.push({
+      kind: "CYBER",
+      id: `dshield-${ip}`,
+      title: `${ip} active attack source: ${targetText}, ${reportText}`,
+      country: country.name,
+      countryCode: country.cca3,
+      source: "SANS ISC/DShield",
+      seenAt: parseReportDate(raw.lastseen),
+      url: `https://isc.sans.edu/ipinfo/${ip}`,
+      ip,
+      attacks,
+      reports,
+      firstSeen: getOptionalString(raw.firstseen),
+      asn: asn && asName ? `${asn} ${asName}` : asn ?? asName,
+    });
+  });
 
   rawArticles.forEach((raw, index) => {
     const country = getCyberCountry(raw, lookup);

@@ -53,13 +53,23 @@ function formatTickerDate(value: string) {
   }).format(date);
 }
 
+function formatCyberMeta(attacks: number | undefined, seenAt: string) {
+  const date = formatTickerDate(seenAt);
+
+  if (!attacks) {
+    return date;
+  }
+
+  return `${new Intl.NumberFormat("en", { notation: "compact" }).format(attacks)} targets | ${date}`;
+}
+
 function toTickerItems(cyber: CyberFeed, interpol: InterpolNotice[]) {
   const cyberItems: TickerItem[] = cyber.incidents.slice(0, 16).map((incident) => ({
     kind: "CYBER",
     id: incident.id,
     name: incident.title,
-    description: `${incident.country} | ${incident.source}`,
-    meta: formatTickerDate(incident.seenAt),
+    description: `${incident.country} | ${incident.source}${incident.ip ? ` | ${incident.ip}` : ""}`,
+    meta: formatCyberMeta(incident.attacks, incident.seenAt),
     url: incident.url,
   }));
 

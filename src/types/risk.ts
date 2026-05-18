@@ -90,6 +90,12 @@ export type CyberIncident = {
   source: string;
   seenAt: string;
   url?: string;
+  ip?: string;
+  attacks?: number;
+  reports?: number;
+  firstSeen?: string;
+  asn?: string;
+  network?: string;
 };
 
 export type CyberVulnerability = {
