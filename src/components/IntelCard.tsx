@@ -40,7 +40,7 @@ export function IntelCard({
         hour: "2-digit",
         minute: "2-digit",
       }).format(new Date(disease.updatedAt))
-    : "Live feed";
+    : "WHO/GDELT feed";
 
   return (
     <DraggablePanel
@@ -109,8 +109,9 @@ export function IntelCard({
             <div className="intel-cell mt-3">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <div>
-                  <p className="stat-label">Active Disease Cases</p>
-                  <p className="stat-value text-[#ff0040]">{formatCompactNumber(disease?.active ?? 0)}</p>
+                  <p className="stat-label">Outbreak Reports</p>
+                  <p className="stat-value text-[#ff0040]">{formatCompactNumber(disease?.reportCount ?? disease?.active ?? 0)}</p>
+                  <p className="data-font mt-1 text-[10px] uppercase text-[#7a8da0]">{disease?.diseaseName ?? "No current signal"}</p>
                 </div>
                 <p className="data-font text-[10px] uppercase text-[#7a8da0]">{diseaseUpdatedAt}</p>
               </div>

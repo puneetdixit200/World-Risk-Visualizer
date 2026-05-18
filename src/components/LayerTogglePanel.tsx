@@ -9,7 +9,7 @@ import { DraggablePanel } from "./DraggablePanel";
 
 const layerConfig: { key: LayerKey; label: string; icon: ComponentType<{ size?: number }> }[] = [
   { key: "threat", label: "Threat Level", icon: ShieldAlert },
-  { key: "disease", label: "Disease Spread", icon: Biohazard },
+  { key: "disease", label: "Outbreak Watch", icon: Biohazard },
   { key: "interpol", label: "Interpol Notices", icon: RadioTower },
   { key: "cyber", label: "Cyber Attacks", icon: Bug },
   { key: "density", label: "Population Density", icon: Users },

@@ -36,6 +36,26 @@ export type RawDiseaseHistory = {
   };
 };
 
+export type RawWhoOutbreak = {
+  DonId?: string;
+  Title?: string;
+  PublicationDateAndTime?: string;
+  PublicationDate?: string;
+  LastModified?: string;
+  UrlName?: string;
+  ItemDefaultUrl?: string;
+};
+
+export type RawGdeltOutbreakArticle = {
+  title?: string;
+  sourcecountry?: string;
+  sourceCountry?: string;
+  seendate?: string;
+  seenDate?: string;
+  url?: string;
+  domain?: string;
+};
+
 export type RawCisaKevCatalog = {
   catalogVersion?: string;
   dateReleased?: string;
@@ -130,15 +150,11 @@ function getStringArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
-function parseGdeltSeenDate(value: string) {
-  const compactMatch = value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
-
-  if (compactMatch) {
-    const [, year, month, day, hour, minute, second] = compactMatch;
-    return `${year}-${month}-${day}T${hour}:${minute}:${second}Z`;
-  }
-
-  return value;
+function stripHtml(value: unknown) {
+  return getString(value)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function createCountryNameLookup(countries: Record<string, CountryIntel>) {
@@ -148,6 +164,167 @@ function createCountryNameLookup(countries: Record<string, CountryIntel>) {
   ]);
 
   return new Map(entries);
+}
+
+function inferDiseaseName(title: string) {
+  const knownDiseases = [
+    "Ebola",
+    "Hantavirus",
+    "Measles",
+    "Dengue",
+    "Mpox",
+    "Cholera",
+    "Marburg",
+    "Avian flu",
+    "Yellow fever",
+    "Polio",
+    "Meningitis",
+    "Lassa fever",
+    "Rift Valley fever",
+  ];
+  const match = knownDiseases.find((diseaseName) => title.toLowerCase().includes(diseaseName.toLowerCase()));
+
+  if (match) {
+    return match;
+  }
+
+  return title.split(/[,|-]/)[0]?.trim() || "Disease outbreak";
+}
+
+function splitWhoTitle(title: string) {
+  const [diseasePart, ...locationParts] = title.split(/,\s+|\s+-\s+/);
+  const locationText = locationParts.join(", ");
+  const countries = locationText
+    .replace(/\b(the )?Democratic Republic of the Congo\b/gi, "Democratic Republic of the Congo")
+    .split(/\s*&\s*|\s+and\s+|,\s*/)
+    .map((value) => value.trim())
+    .filter((value) => value && !/multi-country|global|regional/i.test(value));
+
+  return {
+    diseaseName: inferDiseaseName(diseasePart || title),
+    countries,
+  };
+}
+
+function parseReportDate(value: string | undefined) {
+  if (!value) {
+    return new Date().toISOString();
+  }
+
+  return parseGdeltSeenDate(value);
+}
+
+function addOutbreakRecord(
+  records: Record<string, DiseaseRecord>,
+  country: CountryIntel,
+  diseaseName: string,
+  title: string,
+  source: string,
+  publishedAt: string,
+  url?: string,
+) {
+  const existing = records[country.cca3];
+  const previousCount = existing?.reportCount ?? existing?.active ?? 0;
+  const reportCount = previousCount + 1;
+  const previousDiseases = existing?.diseaseName?.split(", ").filter(Boolean) ?? [];
+  const diseaseNames = Array.from(new Set([...previousDiseases, diseaseName])).slice(0, 4);
+  const sources = Array.from(new Set([...(existing?.sources ?? []), source]));
+  const trend = existing?.trend?.length ? [...existing.trend] : Array.from({ length: 30 }, () => 0);
+  const reportDate = new Date(publishedAt);
+
+  if (!Number.isNaN(reportDate.getTime())) {
+    const today = new Date();
+    const ageDays = Math.floor((Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()) - Date.UTC(reportDate.getUTCFullYear(), reportDate.getUTCMonth(), reportDate.getUTCDate())) / 86_400_000);
+    const index = Math.min(29, Math.max(0, 29 - ageDays));
+    trend[index] += 1;
+  } else {
+    trend[29] += 1;
+  }
+
+  records[country.cca3] = {
+    country: country.name,
+    iso2: country.cca2,
+    iso3: country.cca3,
+    active: reportCount,
+    cases: reportCount,
+    deaths: 0,
+    recovered: 0,
+    lat: country.latlng[0],
+    lng: country.latlng[1],
+    trend,
+    updatedAt: publishedAt,
+    diseaseName: diseaseNames.join(", "),
+    reportCount,
+    latestTitle: title,
+    url,
+    sources,
+  };
+}
+
+export function normalizeOutbreakDisease(
+  whoReports: RawWhoOutbreak[],
+  gdeltArticles: RawGdeltOutbreakArticle[],
+  countries: Record<string, CountryIntel>,
+) {
+  const lookup = createCountryNameLookup(countries);
+  const records: Record<string, DiseaseRecord> = {};
+
+  whoReports.forEach((report) => {
+    const title = getString(report.Title);
+
+    if (!title) {
+      return;
+    }
+
+    const parsed = splitWhoTitle(title);
+    const publishedAt = parseReportDate(report.PublicationDateAndTime ?? report.PublicationDate ?? report.LastModified);
+    const url = report.UrlName
+      ? `https://www.who.int/emergencies/disease-outbreak-news/item/${report.UrlName}`
+      : report.ItemDefaultUrl
+        ? `https://www.who.int/emergencies/disease-outbreak-news/item${report.ItemDefaultUrl}`
+        : undefined;
+
+    parsed.countries.forEach((countryName) => {
+      const country = lookup.get(normalizeCountryName(countryName));
+
+      if (country) {
+        addOutbreakRecord(records, country, parsed.diseaseName, title, "WHO", publishedAt, url);
+      }
+    });
+  });
+
+  gdeltArticles.forEach((article) => {
+    const sourceCountry = article.sourcecountry ?? article.sourceCountry;
+    const country = sourceCountry ? lookup.get(normalizeCountryName(sourceCountry)) : undefined;
+    const title = getString(article.title);
+
+    if (!country || !title) {
+      return;
+    }
+
+    addOutbreakRecord(
+      records,
+      country,
+      inferDiseaseName(title),
+      title,
+      "GDELT",
+      parseReportDate(article.seendate ?? article.seenDate),
+      article.url,
+    );
+  });
+
+  return records;
+}
+
+function parseGdeltSeenDate(value: string) {
+  const compactMatch = value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
+
+  if (compactMatch) {
+    const [, year, month, day, hour, minute, second] = compactMatch;
+    return `${year}-${month}-${day}T${hour}:${minute}:${second}Z`;
+  }
+
+  return value;
 }
 
 function getCyberCountry(raw: JsonRecord, lookup: Map<string, CountryIntel>) {
@@ -306,11 +483,4 @@ export function aggregateInterpolNotices(rawNotices: JsonRecord[], iso2ToIso3: R
     source: "live",
     fetchedAt: new Date().toISOString(),
   };
-}
-
-function stripHtml(value: unknown) {
-  return getString(value)
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }

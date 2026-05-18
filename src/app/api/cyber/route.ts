@@ -6,6 +6,7 @@ import {
   normalizeCyberFeed,
   type RawCisaKevCatalog,
 } from "@/lib/normalizers";
+import { fetchJsonWithNodeHttps } from "@/lib/serverJson";
 import type { RestCountryRecord } from "@/types/risk";
 
 export const revalidate = 600;
@@ -16,6 +17,21 @@ const CISA_KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_explo
 const COUNTRIES_URL =
   "https://restcountries.com/v3.1/all?fields=name,cca2,cca3,ccn3,population,area,borders,flags,latlng,region";
 const UPSTREAM_TIMEOUT_MS = 7000;
+const EMPTY_KEV_CATALOG: RawCisaKevCatalog = { vulnerabilities: [] };
+
+type GdeltResult = {
+  articles: Record<string, unknown>[];
+  error?: string;
+};
+
+type KevResult = {
+  catalog: RawCisaKevCatalog;
+  error?: string;
+};
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
 
 async function fetchCountries() {
   try {
@@ -35,39 +51,78 @@ async function fetchCountries() {
   }
 }
 
+async function fetchGdeltArticles(): Promise<GdeltResult> {
+  try {
+    const payload = await fetchJsonWithNodeHttps<{ articles?: Record<string, unknown>[] }>(
+      GDELT_URL,
+      UPSTREAM_TIMEOUT_MS,
+    );
+
+    return { articles: payload.articles ?? [] };
+  } catch (error) {
+    return { articles: [], error: getErrorMessage(error, "Unable to fetch GDELT cyber articles.") };
+  }
+}
+
+async function fetchKevCatalog(): Promise<KevResult> {
+  try {
+    const response = await fetch(CISA_KEV_URL, {
+      next: { revalidate },
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      return {
+        catalog: EMPTY_KEV_CATALOG,
+        error: `CISA KEV feed returned ${response.status}`,
+      };
+    }
+
+    return { catalog: (await response.json()) as RawCisaKevCatalog };
+  } catch (error) {
+    return {
+      catalog: EMPTY_KEV_CATALOG,
+      error: getErrorMessage(error, "Unable to fetch CISA KEV feed."),
+    };
+  }
+}
+
 export async function GET() {
   try {
-    const [gdeltResponse, kevResponse, countries] = await Promise.all([
-      fetch(GDELT_URL, {
-        next: { revalidate },
-        headers: { accept: "application/json" },
-        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-      }),
-      fetch(CISA_KEV_URL, {
-        next: { revalidate },
-        headers: { accept: "application/json" },
-        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-      }),
+    const [gdelt, kev, countries] = await Promise.all([
+      fetchGdeltArticles(),
+      fetchKevCatalog(),
       fetchCountries(),
     ]);
 
-    if (!gdeltResponse.ok) {
-      throw new Error(`GDELT DOC API returned ${gdeltResponse.status}`);
+    if (gdelt.articles.length === 0 && kev.catalog.vulnerabilities?.length === 0) {
+      throw new Error(gdelt.error ?? kev.error ?? "Cyber upstreams returned no usable records.");
     }
 
-    if (!kevResponse.ok) {
-      throw new Error(`CISA KEV feed returned ${kevResponse.status}`);
-    }
+    const feed = normalizeCyberFeed(gdelt.articles, kev.catalog, countries);
+    const incidentFallback = feed.incidents.length === 0;
+    const responseFeed = incidentFallback
+      ? {
+          ...feed,
+          counts: fallbackCyber.counts,
+          incidents: fallbackCyber.incidents,
+          total: fallbackCyber.total,
+          source: "fallback" as const,
+        }
+      : feed;
+    const upstreamErrors = [
+      gdelt.error,
+      kev.error,
+      incidentFallback ? "GDELT returned no country-mapped cyber incidents; showing seeded incident fallback." : undefined,
+    ]
+      .filter(Boolean)
+      .join("; ");
 
-    const gdeltPayload = (await gdeltResponse.json()) as { articles?: Record<string, unknown>[] };
-    const kevPayload = (await kevResponse.json()) as RawCisaKevCatalog;
-    const feed = normalizeCyberFeed(gdeltPayload.articles ?? [], kevPayload, countries);
-
-    if (feed.incidents.length === 0) {
-      throw new Error("GDELT returned no country-mapped cyber incidents.");
-    }
-
-    return NextResponse.json(feed);
+    return NextResponse.json({
+      ...responseFeed,
+      error: upstreamErrors || undefined,
+    });
   } catch (error) {
     return NextResponse.json({
       ...fallbackCyber,

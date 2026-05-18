@@ -17,7 +17,7 @@ export function Sparkline({ data, color = "#00d4ff" }: SparklineProps) {
     .join(" ");
 
   return (
-    <svg viewBox="0 0 100 32" role="img" aria-label="30 day disease trend" className="h-10 w-full">
+    <svg viewBox="0 0 100 32" role="img" aria-label="30 day outbreak report trend" className="h-10 w-full">
       <polyline
         points={points}
         fill="none"

@@ -5,6 +5,7 @@ import {
   normalizeCountries,
   normalizeCyberFeed,
   normalizeDisease,
+  normalizeOutbreakDisease,
 } from "./normalizers";
 
 describe("normalizers", () => {
@@ -51,6 +52,75 @@ describe("normalizers", () => {
 
     expect(disease.IND.active).toBe(1000);
     expect(disease.IND.trend).toEqual([10, 20, 35]);
+  });
+
+  it("normalizes WHO and GDELT outbreak reports beyond COVID", () => {
+    const countries = normalizeCountries([
+      {
+        name: { common: "DR Congo", official: "Democratic Republic of the Congo" },
+        cca2: "CD",
+        cca3: "COD",
+        ccn3: "180",
+        population: 108_000_000,
+        area: 2_344_858,
+        borders: ["UGA"],
+        flags: { svg: "https://flagcdn.com/cd.svg" },
+        latlng: [0, 25],
+        region: "Africa",
+      },
+      {
+        name: { common: "Uganda", official: "Republic of Uganda" },
+        cca2: "UG",
+        cca3: "UGA",
+        ccn3: "800",
+        population: 48_000_000,
+        area: 241_550,
+        borders: ["COD"],
+        flags: { svg: "https://flagcdn.com/ug.svg" },
+        latlng: [1, 32],
+        region: "Africa",
+      },
+      {
+        name: { common: "Bangladesh", official: "People's Republic of Bangladesh" },
+        cca2: "BD",
+        cca3: "BGD",
+        ccn3: "050",
+        population: 169_000_000,
+        area: 147_570,
+        borders: ["IND", "MMR"],
+        flags: { svg: "https://flagcdn.com/bd.svg" },
+        latlng: [24, 90],
+        region: "Asia",
+      },
+    ]);
+
+    const disease = normalizeOutbreakDisease(
+      [
+        {
+          DonId: "2026-DON602",
+          Title: "Ebola disease caused by Bundibugyo virus, Democratic Republic of the Congo & Uganda",
+          PublicationDateAndTime: "2026-05-16T22:00:00Z",
+          UrlName: "2026-DON602",
+        },
+      ],
+      [
+        {
+          title: "Dengue outbreak pressure rises after monsoon rains",
+          sourcecountry: "Bangladesh",
+          seendate: "20260518T090000Z",
+          url: "https://example.com/dengue",
+          domain: "example.com",
+        },
+      ],
+      countries,
+    );
+
+    expect(disease.COD.active).toBe(1);
+    expect(disease.COD.diseaseName).toContain("Ebola");
+    expect(disease.UGA.latestTitle).toContain("Bundibugyo");
+    expect(disease.BGD.diseaseName).toBe("Dengue");
+    expect(disease.BGD.reportCount).toBe(1);
+    expect(disease.BGD.sources).toContain("GDELT");
   });
 
   it("aggregates Interpol notices by ISO3 country code", () => {

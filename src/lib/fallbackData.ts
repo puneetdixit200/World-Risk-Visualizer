@@ -1,6 +1,6 @@
 import type { CyberFeed, InterpolAggregate, RestCountryRecord } from "@/types/risk";
 
-import { normalizeCountries, normalizeDisease } from "./normalizers";
+import { normalizeCountries, normalizeOutbreakDisease } from "./normalizers";
 
 const fallbackCountriesRaw: RestCountryRecord[] = [
   {
@@ -111,18 +111,79 @@ const fallbackCountriesRaw: RestCountryRecord[] = [
     latlng: [-29, 24],
     region: "Africa",
   },
+  {
+    name: { common: "DR Congo", official: "Democratic Republic of the Congo" },
+    cca2: "CD",
+    cca3: "COD",
+    ccn3: "180",
+    population: 108_407_721,
+    area: 2_344_858,
+    borders: ["AGO", "BDI", "CAF", "COG", "RWA", "SSD", "TZA", "UGA", "ZMB"],
+    flags: { svg: "https://flagcdn.com/cd.svg" },
+    latlng: [0, 25],
+    region: "Africa",
+  },
+  {
+    name: { common: "Uganda", official: "Republic of Uganda" },
+    cca2: "UG",
+    cca3: "UGA",
+    ccn3: "800",
+    population: 45_853_778,
+    area: 241_550,
+    borders: ["COD", "KEN", "RWA", "SSD", "TZA"],
+    flags: { svg: "https://flagcdn.com/ug.svg" },
+    latlng: [1, 32],
+    region: "Africa",
+  },
+  {
+    name: { common: "Bangladesh", official: "People's Republic of Bangladesh" },
+    cca2: "BD",
+    cca3: "BGD",
+    ccn3: "050",
+    population: 169_356_251,
+    area: 147_570,
+    borders: ["IND", "MMR"],
+    flags: { svg: "https://flagcdn.com/bd.svg" },
+    latlng: [24, 90],
+    region: "Asia",
+  },
 ];
 
 export const fallbackCountries = normalizeCountries(fallbackCountriesRaw);
 
-export const fallbackDisease = normalizeDisease([
-  { country: "United States", active: 786_167, cases: 111_820_082, deaths: 1_219_487, recovered: 109_814_428, countryInfo: { iso2: "US", iso3: "USA", lat: 38, long: -97 } },
-  { country: "India", active: 4_891, cases: 45_000_000, deaths: 533_000, recovered: 44_460_000, countryInfo: { iso2: "IN", iso3: "IND", lat: 20, long: 77 } },
-  { country: "China", active: 118_977, cases: 99_370_000, deaths: 121_878, recovered: 99_130_000, countryInfo: { iso2: "CN", iso3: "CHN", lat: 35, long: 105 } },
-  { country: "Brazil", active: 330_401, cases: 38_743_918, deaths: 711_380, recovered: 37_702_137, countryInfo: { iso2: "BR", iso3: "BRA", lat: -10, long: -55 } },
-  { country: "Russia", active: 171_231, cases: 24_124_215, deaths: 402_756, recovered: 23_550_228, countryInfo: { iso2: "RU", iso3: "RUS", lat: 60, long: 100 } },
-  { country: "Nigeria", active: 3_101, cases: 267_188, deaths: 3_155, recovered: 260_932, countryInfo: { iso2: "NG", iso3: "NGA", lat: 10, long: 8 } },
-]);
+export const fallbackDisease = normalizeOutbreakDisease(
+  [
+    {
+      DonId: "fallback-don-1",
+      Title: "Ebola disease caused by Bundibugyo virus, Democratic Republic of the Congo & Uganda",
+      PublicationDateAndTime: new Date().toISOString(),
+      UrlName: "2026-DON602",
+    },
+    {
+      DonId: "fallback-don-2",
+      Title: "Measles - Bangladesh",
+      PublicationDateAndTime: new Date(Date.now() - 86_400_000).toISOString(),
+      UrlName: "2026-DON598",
+    },
+  ],
+  [
+    {
+      title: "Dengue outbreak reports continue across India",
+      sourcecountry: "India",
+      seendate: new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, ""),
+      url: "https://www.who.int/emergencies/disease-outbreak-news",
+      domain: "who.int",
+    },
+    {
+      title: "Cholera outbreak response expands in Nigeria",
+      sourcecountry: "Nigeria",
+      seendate: new Date(Date.now() - 2 * 86_400_000).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, ""),
+      url: "https://www.who.int/emergencies/disease-outbreak-news",
+      domain: "who.int",
+    },
+  ],
+  fallbackCountries,
+);
 
 export const fallbackInterpol: InterpolAggregate = {
   counts: {

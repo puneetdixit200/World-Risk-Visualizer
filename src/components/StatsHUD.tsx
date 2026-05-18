@@ -67,7 +67,7 @@ export function StatsHUD({ stats, sourceNote }: StatsHUDProps) {
           <p className="stat-value text-[#00d4ff]">{formatCompactNumber(cyber)}</p>
         </div>
         <div className="stat-cell">
-          <p className="stat-label">Active Cases</p>
+          <p className="stat-label">Outbreak Reports</p>
           <p className="stat-value">{formatCompactNumber(cases)}</p>
         </div>
         <div className="stat-cell">

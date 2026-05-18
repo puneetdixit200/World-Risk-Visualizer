@@ -22,7 +22,7 @@ export function calculateRiskScore({
   borderCount,
 }: RiskInputs) {
   const diseaseRate = population > 0 ? activeCases / population : 0;
-  const diseaseBurden = Math.min(45, diseaseRate * 300);
+  const diseaseBurden = activeCases > 1000 ? Math.min(45, diseaseRate * 300) : Math.min(35, activeCases * 7);
   const interpolBurden = Math.min(54, interpolNotices * 3);
   const borderBurden = Math.min(14, borderCount * 1.2);
   const scaleBurden = population > 100_000_000 ? 5 : 0;

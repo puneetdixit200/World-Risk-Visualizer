@@ -208,6 +208,14 @@ export function scaleCircleRadius(activeCases: number) {
   return Math.min(34, Math.max(4, Math.sqrt(activeCases) * 0.028 + 3));
 }
 
+export function scaleOutbreakRadius(reportCount: number) {
+  if (reportCount <= 0) {
+    return 0;
+  }
+
+  return Math.min(32, Math.max(5, Math.sqrt(reportCount) * 5 + 4));
+}
+
 export function formatCompactNumber(value: number) {
   return new Intl.NumberFormat("en", {
     notation: "compact",

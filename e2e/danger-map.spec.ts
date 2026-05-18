@@ -65,7 +65,7 @@ test("renders the command center map and interactive controls", async ({ page })
   await page.getByLabel("Toggle night vision").click();
   await expect(page.locator("main.danger-shell")).toHaveClass(/night-vision/);
 
-  await page.getByRole("button", { name: "Disease Spread" }).click();
+  await page.getByRole("button", { name: "Outbreak Watch" }).click();
   await expect(page.locator(".disease-pulse")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Cyber Attacks" }).click();

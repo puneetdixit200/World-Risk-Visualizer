@@ -57,6 +57,11 @@ export type DiseaseRecord = {
   lng: number;
   trend: number[];
   updatedAt?: string;
+  diseaseName?: string;
+  reportCount?: number;
+  latestTitle?: string;
+  url?: string;
+  sources?: string[];
 };
 
 export type InterpolNotice = {

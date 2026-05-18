@@ -24,6 +24,7 @@ import {
   getDiseaseValueAtIndex,
   sanitizeWorldFeatureCollection,
   scaleCircleRadius,
+  scaleOutbreakRadius,
 } from "@/lib/geoUtils";
 import { calculateDefcon, calculateRiskByCountry, getRiskColor } from "@/lib/riskCalculator";
 import type {
@@ -374,7 +375,7 @@ export function DangerMap() {
   const { enabled: soundEnabled, playPing, toggleSound } = useImmersiveAudio(activeRisk);
 
   const globalStats = useMemo(() => {
-    const activeCases = Object.values(disease).reduce((sum, record) => sum + record.active, 0);
+    const activeCases = Object.values(disease).reduce((sum, record) => sum + (record.reportCount ?? record.active), 0);
     const scores = Object.values(riskScores);
 
     return {
@@ -575,7 +576,7 @@ export function DangerMap() {
                   fillColor="#ff0040"
                   fillOpacity={0.28}
                   key={record.iso3}
-                  radius={scaleCircleRadius(value)}
+                  radius={record.reportCount ? scaleOutbreakRadius(value) : scaleCircleRadius(value)}
                   stroke
                   color="#ff0040"
                   weight={2}
@@ -583,7 +584,7 @@ export function DangerMap() {
                   <Popup>
                     <strong>{record.country}</strong>
                     <br />
-                    Active cases: {formatCompactNumber(value)}
+                    {record.diseaseName ?? "Outbreak reports"}: {formatCompactNumber(value)}
                   </Popup>
                 </CircleMarker>
               ))
@@ -679,11 +680,11 @@ export function DangerMap() {
         role="region"
       >
         <div className="mb-1 flex items-center justify-between gap-3">
-          <p className="hud-title text-xs">DISEASE TIME SLIDER</p>
+          <p className="hud-title text-xs">OUTBREAK TIME SLIDER</p>
           <p className="data-font text-[10px] uppercase text-[#7a8da0]">Day {timeIndex + 1}/30</p>
         </div>
         <input
-          aria-label="Disease timeline day"
+          aria-label="Outbreak timeline day"
           max={29}
           min={0}
           onChange={(event) => setTimeIndex(Number(event.target.value))}
@@ -714,7 +715,7 @@ export function DangerMap() {
           <p className="hud-title text-sm">{loadError ? "FEED ERROR" : "SYNCING FEEDS"}</p>
           <h1 className="mt-2 text-2xl font-semibold">{loadError ? "Unable to load command data" : "Building world risk layer"}</h1>
           <p className="mt-3 text-sm text-[#7a8da0]">
-            {loadError ?? "Fetching countries, disease, Interpol, and cyber feeds through cached route handlers."}
+            {loadError ?? "Fetching countries, WHO outbreaks, GDELT reports, Interpol, and cyber feeds through cached route handlers."}
           </p>
         </section>
       ) : null}
