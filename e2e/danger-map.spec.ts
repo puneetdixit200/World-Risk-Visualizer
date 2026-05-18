@@ -24,13 +24,13 @@ test("renders the command center map and interactive controls", async ({ page })
   expect(afterDrag?.x).toBeGreaterThan((beforeDrag?.x ?? 0) + 120);
   expect(afterDrag?.y).toBeGreaterThan((beforeDrag?.y ?? 0) + 60);
 
-  const longHorizontalSlivers = await page.locator(".country-path").evaluateAll((paths) =>
+  const longHorizontalBands = await page.locator(".country-path").evaluateAll((paths) =>
     paths.filter((path) => {
       const box = path.getBoundingClientRect();
-      return box.width > window.innerWidth * 0.7 && box.height < 12;
+      return box.width > window.innerWidth * 0.78 && box.height < 180;
     }).length,
   );
-  expect(longHorizontalSlivers).toBe(0);
+  expect(longHorizontalBands).toBe(0);
 
   const has3DPixels = await page.locator(".threat-scene-canvas").evaluate((canvas) => {
     const element = canvas as HTMLCanvasElement;

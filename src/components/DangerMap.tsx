@@ -21,6 +21,7 @@ import {
   createDeterministicScatter,
   formatCompactNumber,
   getDiseaseValueAtIndex,
+  sanitizeWorldFeatureCollection,
   scaleCircleRadius,
 } from "@/lib/geoUtils";
 import { calculateDefcon, calculateRiskByCountry, getRiskColor } from "@/lib/riskCalculator";
@@ -253,13 +254,7 @@ export function DangerMap() {
     const topology = countries110m as WorldTopology;
     const collection = feature(topology, topology.objects.countries) as FeatureCollection<Geometry, { name?: string }>;
 
-    return {
-      ...collection,
-      features: collection.features.filter((countryFeature) => {
-        const id = String(countryFeature.id).padStart(3, "0");
-        return id !== "010" && id !== "242";
-      }),
-    };
+    return sanitizeWorldFeatureCollection(collection);
   }, []);
 
   useEffect(() => {

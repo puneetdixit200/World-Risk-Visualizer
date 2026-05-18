@@ -1,3 +1,5 @@
+import type { FeatureCollection, Geometry, Position } from "geojson";
+
 const NAME_ALIASES: Record<string, string> = {
   "united states of america": "united states",
   "russian federation": "russia",
@@ -11,6 +13,10 @@ const NAME_ALIASES: Record<string, string> = {
   "tanzania united republic of": "tanzania",
 };
 
+const DROPPED_ATLAS_FEATURE_IDS = new Set(["010", "242"]);
+const ANTIMERIDIAN_SPAN_DEGREES = 300;
+const SLIVER_LATITUDE_SPAN_DEGREES = 8;
+
 export function normalizeCountryName(name: string) {
   const normalized = name
     .normalize("NFD")
@@ -22,6 +28,134 @@ export function normalizeCountryName(name: string) {
     .toLowerCase();
 
   return NAME_ALIASES[normalized] ?? normalized;
+}
+
+function normalizedAtlasId(countryFeature: { id?: string | number }) {
+  if (countryFeature.id === undefined || countryFeature.id === null) {
+    return undefined;
+  }
+
+  return String(countryFeature.id).padStart(3, "0");
+}
+
+function getRingBounds(ring: Position[]) {
+  let minLng = Infinity;
+  let maxLng = -Infinity;
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+
+  for (const position of ring) {
+    const [lng, lat] = position;
+
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+      continue;
+    }
+
+    minLng = Math.min(minLng, lng);
+    maxLng = Math.max(maxLng, lng);
+    minLat = Math.min(minLat, lat);
+    maxLat = Math.max(maxLat, lat);
+  }
+
+  if (!Number.isFinite(minLng) || !Number.isFinite(minLat)) {
+    return { spanLng: 0, spanLat: 0 };
+  }
+
+  return {
+    spanLng: maxLng - minLng,
+    spanLat: maxLat - minLat,
+  };
+}
+
+function unwrapAntimeridianRing(ring: Position[]) {
+  if (ring.length === 0) {
+    return ring;
+  }
+
+  let previousLng = ring[0][0];
+  let offset = 0;
+
+  return ring.map((position, index) => {
+    if (index === 0) {
+      return position;
+    }
+
+    let lng = position[0] + offset;
+
+    while (lng - previousLng > 180) {
+      offset -= 360;
+      lng -= 360;
+    }
+
+    while (previousLng - lng > 180) {
+      offset += 360;
+      lng += 360;
+    }
+
+    previousLng = lng;
+    return [lng, ...position.slice(1)];
+  });
+}
+
+function sanitizePolygonRings(rings: Position[][]) {
+  const sanitizedRings: Position[][] = [];
+
+  for (let index = 0; index < rings.length; index += 1) {
+    const ring = rings[index];
+    const bounds = getRingBounds(ring);
+    const crossesAntimeridian = bounds.spanLng > ANTIMERIDIAN_SPAN_DEGREES;
+    const isThinSliver = crossesAntimeridian && bounds.spanLat < SLIVER_LATITUDE_SPAN_DEGREES;
+
+    if (isThinSliver) {
+      if (index === 0) {
+        return [];
+      }
+
+      continue;
+    }
+
+    sanitizedRings.push(crossesAntimeridian ? unwrapAntimeridianRing(ring) : ring);
+  }
+
+  return sanitizedRings;
+}
+
+function sanitizeGeometry(geometry: Geometry): Geometry | null {
+  if (geometry.type === "Polygon") {
+    const coordinates = sanitizePolygonRings(geometry.coordinates);
+    return coordinates.length > 0 ? { ...geometry, coordinates } : null;
+  }
+
+  if (geometry.type === "MultiPolygon") {
+    const coordinates = geometry.coordinates
+      .map((polygon) => sanitizePolygonRings(polygon))
+      .filter((polygon) => polygon.length > 0);
+
+    return coordinates.length > 0 ? { ...geometry, coordinates } : null;
+  }
+
+  return geometry;
+}
+
+export function sanitizeWorldFeatureCollection<TProperties>(
+  collection: FeatureCollection<Geometry, TProperties>,
+): FeatureCollection<Geometry, TProperties> {
+  const features = collection.features.flatMap((countryFeature) => {
+    const id = normalizedAtlasId(countryFeature);
+
+    if (id && DROPPED_ATLAS_FEATURE_IDS.has(id)) {
+      return [];
+    }
+
+    if (!countryFeature.geometry) {
+      return [countryFeature];
+    }
+
+    const geometry = sanitizeGeometry(countryFeature.geometry);
+    return geometry ? [{ ...countryFeature, geometry }] : [];
+  });
+
+  return { ...collection, features };
 }
 
 function hashString(seed: string) {
