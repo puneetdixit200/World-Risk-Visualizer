@@ -11,10 +11,13 @@ import { DraggablePanel } from "./DraggablePanel";
 type ComparisonPanelProps = {
   countries: CountryIntel[];
   riskScores: Record<string, number>;
+  cyberCounts: Record<string, number>;
+  diseaseCounts: Record<string, number>;
+  interpolCounts: Record<string, number>;
   onClose: () => void;
 };
 
-export function ComparisonPanel({ countries, riskScores, onClose }: ComparisonPanelProps) {
+export function ComparisonPanel({ countries, riskScores, cyberCounts, diseaseCounts, interpolCounts, onClose }: ComparisonPanelProps) {
   if (countries.length < 2) {
     return null;
   }
@@ -28,7 +31,7 @@ export function ComparisonPanel({ countries, riskScores, onClose }: ComparisonPa
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <p className="hud-title text-xs">COMPARISON MODE</p>
+          <p className="hud-title text-xs">RISK BATTLE</p>
           <h2 className="text-lg font-semibold">
             {countries[0].name} vs {countries[1].name}
           </h2>
@@ -53,6 +56,10 @@ export function ComparisonPanel({ countries, riskScores, onClose }: ComparisonPa
                 <span>Area {formatCompactNumber(country.area)}</span>
                 <span>Borders {country.borderCount}</span>
                 <span>Density {formatCompactNumber(country.density)}</span>
+                <span>Cyber {formatCompactNumber(cyberCounts[country.cca3] ?? 0)}</span>
+                <span>Outbreak {formatCompactNumber(diseaseCounts[country.cca3] ?? 0)}</span>
+                <span>Interpol {formatCompactNumber(interpolCounts[country.cca3] ?? 0)}</span>
+                <span>Delta {risk - (riskScores[countries.find((item) => item.cca3 !== country.cca3)?.cca3 ?? ""] ?? risk)}</span>
               </div>
             </div>
           );

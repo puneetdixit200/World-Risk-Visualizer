@@ -131,6 +131,12 @@ export type GlobalStats = {
   defcon: number;
 };
 
+export type SourceHealth = {
+  label: string;
+  status: "live" | "cache" | "fallback";
+  age?: string;
+};
+
 export type LayerKey = "threat" | "disease" | "interpol" | "cyber" | "density" | "corridors";
 
 export type LayerState = Record<LayerKey, boolean>;

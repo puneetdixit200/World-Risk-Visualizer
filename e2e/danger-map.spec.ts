@@ -16,7 +16,11 @@ test("renders the command center map and interactive controls", async ({ page })
   await expect(page.getByRole("button", { name: "Cyber Attacks" })).toBeVisible();
   await expect(page.getByRole("button", { name: "FBI Overlay" })).toHaveCount(0);
   await expect(page.locator(".cyber-pulse").first()).toBeVisible();
+  await expect(page.locator(".cyber-heat-trail").first()).toBeVisible();
+  await expect(page.locator(".attack-arc-line").first()).toBeVisible();
   await expect(page.locator(".ticker-source").filter({ hasText: "CYBER" }).first()).toBeVisible();
+  await expect(page.getByLabel("Source confidence badges")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open command search" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Open Puneet Dixit's GitHub profile" })).toHaveAttribute(
     "href",
     "https://github.com/puneetdixit200",
@@ -50,6 +54,16 @@ test("renders the command center map and interactive controls", async ({ page })
   await page.getByLabel("Toggle night vision").click();
   await expect(page.locator("main.danger-shell")).toHaveClass(/night-vision/);
 
+  await page.getByRole("button", { name: "Open command search" }).click();
+  await expect(page.getByLabel("Threat search command palette")).toBeVisible();
+  await page.getByLabel("Search countries, IPs, CVEs, outbreaks, and notices").fill("United");
+  await expect(page.locator(".command-result").first()).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByLabel("Threat search command palette")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Replay incidents" }).click();
+  await expect(page.getByText(/Hour \d+\/24/)).toBeVisible();
+
   await page.getByRole("button", { name: "Outbreak Watch" }).click();
   await expect(page.locator(".disease-pulse")).toHaveCount(0);
 
@@ -66,4 +80,7 @@ test("renders the command center map and interactive controls", async ({ page })
     target.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, view: window }));
   });
   await expect(page.locator(".intel-card.open")).toBeVisible();
+  await expect(page.getByLabel("Country lockdown simulator")).toBeVisible();
+  await page.getByLabel("Country lockdown simulator").getByText("Patch CVEs").click();
+  await expect(page.getByText(/Simulated risk:/)).toBeVisible();
 });

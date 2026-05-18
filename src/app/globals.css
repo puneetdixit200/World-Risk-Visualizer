@@ -128,6 +128,17 @@ button {
   filter: drop-shadow(0 0 12px rgba(0, 212, 255, 0.8));
 }
 
+.cyber-heat-trail {
+  animation: heat-trail 3.6s ease-out infinite;
+  filter: blur(0.4px) drop-shadow(0 0 12px rgba(0, 212, 255, 0.5));
+}
+
+.attack-arc-line {
+  stroke-dasharray: 4 12;
+  animation: attack-arc-flow 2.4s linear infinite;
+  filter: drop-shadow(0 0 10px rgba(255, 0, 64, 0.55));
+}
+
 .corridor-line {
   stroke-dasharray: 8 10;
   animation: corridor-flow 1.6s linear infinite;
@@ -338,6 +349,45 @@ button {
   text-shadow: 0 0 18px rgba(255, 0, 64, 0.48);
 }
 
+.source-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 4px 7px;
+  border: 1px solid rgba(122, 141, 160, 0.16);
+  border-radius: 999px;
+  color: #aab8c5;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.source-badge strong {
+  color: var(--accent);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-weight: 600;
+}
+
+.source-badge.cache strong {
+  color: var(--warning);
+}
+
+.source-badge.fallback strong {
+  color: var(--danger);
+}
+
+.source-badge em {
+  color: var(--muted);
+  font-style: normal;
+}
+
 .intel-card {
   z-index: 1220;
   width: min(392px, calc(100vw - 36px));
@@ -432,6 +482,113 @@ button {
   background: rgba(255, 255, 255, 0.025);
 }
 
+.simulator-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px;
+  border: 1px solid rgba(0, 212, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(0, 212, 255, 0.045);
+}
+
+.simulator-toggles {
+  display: grid;
+  gap: 6px;
+}
+
+.simulator-toggles label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #d8e4ee;
+  font-size: 12px;
+}
+
+.simulator-toggles input {
+  accent-color: var(--cyan);
+}
+
+.command-launcher {
+  position: fixed;
+  top: 18px;
+  left: calc(50% + 148px);
+  z-index: 1250;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 255, 136, 0.16);
+  border-radius: 8px;
+  background: rgba(8, 12, 18, 0.86);
+  color: #d8e4ee;
+  backdrop-filter: blur(18px);
+}
+
+.command-palette {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  z-index: 1320;
+  width: min(560px, calc(100vw - 36px));
+  overflow: hidden;
+  border: 1px solid rgba(0, 255, 136, 0.18);
+  border-radius: 8px;
+  background: rgba(8, 12, 18, 0.97);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.58);
+  transform: translateX(-50%);
+  backdrop-filter: blur(24px);
+}
+
+.command-search-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-bottom: 1px solid rgba(0, 255, 136, 0.1);
+}
+
+.command-search-row input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #f0f6fb;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.command-result-list {
+  max-height: 360px;
+  overflow: auto;
+  padding: 6px;
+}
+
+.command-result {
+  display: grid;
+  width: 100%;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #edf6ff;
+  text-align: left;
+}
+
+.command-result:hover,
+.command-result:focus-visible {
+  outline: 0;
+  background: rgba(0, 255, 136, 0.08);
+}
+
+.command-result span + span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .chip-list {
   display: flex;
   flex-wrap: wrap;
@@ -471,7 +628,7 @@ button {
   align-items: center;
   gap: 28px;
   white-space: nowrap;
-  animation: ticker-scroll 42s linear infinite;
+  animation: ticker-scroll 86s linear infinite;
 }
 
 .ticker-item {
@@ -557,6 +714,26 @@ button {
   accent-color: var(--danger);
 }
 
+.replay-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 11px;
+}
+
+.replay-row button {
+  min-height: 28px;
+  border: 1px solid rgba(0, 212, 255, 0.28);
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: #b8ecff;
+  background: rgba(0, 212, 255, 0.06);
+}
+
 .loading-panel {
   position: fixed;
   inset: auto 18px 80px 18px;
@@ -629,6 +806,25 @@ button {
   50% {
     opacity: 0.48;
     stroke-width: 8;
+  }
+}
+
+@keyframes heat-trail {
+  0% {
+    opacity: 0.28;
+    stroke-width: 1;
+  }
+  70% {
+    opacity: 0.08;
+  }
+  100% {
+    opacity: 0.02;
+  }
+}
+
+@keyframes attack-arc-flow {
+  to {
+    stroke-dashoffset: -48;
   }
 }
 

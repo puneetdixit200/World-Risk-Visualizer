@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { formatCompactNumber } from "@/lib/geoUtils";
-import type { GlobalStats } from "@/types/risk";
+import type { GlobalStats, SourceHealth } from "@/types/risk";
 
 import { DraggablePanel } from "./DraggablePanel";
 
@@ -35,9 +35,10 @@ function useCountUp(value: number) {
 type StatsHUDProps = {
   stats: GlobalStats;
   sourceNote?: string;
+  sources: SourceHealth[];
 };
 
-export function StatsHUD({ stats, sourceNote }: StatsHUDProps) {
+export function StatsHUD({ stats, sourceNote, sources }: StatsHUDProps) {
   const interpol = useCountUp(stats.interpolTotal);
   const cyber = useCountUp(stats.cyberIncidents);
   const cases = useCountUp(stats.activeCases);
@@ -78,6 +79,15 @@ export function StatsHUD({ stats, sourceNote }: StatsHUDProps) {
           <p className="stat-label">Status</p>
           <p className="stat-value">{stats.defcon <= 2 ? "RED" : "WATCH"}</p>
         </div>
+      </div>
+      <div className="source-badges" aria-label="Source confidence badges">
+        {sources.map((source) => (
+          <span className={`source-badge ${source.status}`} key={source.label}>
+            {source.label}
+            <strong>{source.status}</strong>
+            {source.age ? <em>{source.age}</em> : null}
+          </span>
+        ))}
       </div>
     </DraggablePanel>
   );

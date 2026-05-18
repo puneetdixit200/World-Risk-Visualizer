@@ -9,6 +9,7 @@ import { feature } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import countries110m from "world-atlas/countries-110m.json";
 
+import { CommandPalette } from "@/components/CommandPalette";
 import { ComparisonPanel } from "@/components/ComparisonPanel";
 import { CRTOverlay } from "@/components/CRTOverlay";
 import { DraggablePanel } from "@/components/DraggablePanel";
@@ -17,6 +18,13 @@ import { LayerTogglePanel } from "@/components/LayerTogglePanel";
 import { MapZoomControls } from "@/components/MapZoomControls";
 import { StatsHUD } from "@/components/StatsHUD";
 import { ThreatTicker } from "@/components/ThreatTicker";
+import {
+  buildCommandPaletteItems,
+  buildSourceHealth,
+  getLikelyAttackTarget,
+  getReplayCyberCounts,
+  type CommandPaletteItem,
+} from "@/lib/commandCenter";
 import {
   createDeterministicScatter,
   formatCompactNumber,
@@ -34,6 +42,7 @@ import type {
   InterpolAggregate,
   LayerKey,
   LayerState,
+  SourceHealth,
 } from "@/types/risk";
 
 type CountryFeature = Feature<Geometry, { name?: string }> & {
@@ -250,6 +259,12 @@ export function DangerMap() {
   });
   const [cyber, setCyber] = useState<CyberFeed>(fallbackCyber);
   const [sourceNote, setSourceNote] = useState("Live cache");
+  const [sourceHealth, setSourceHealth] = useState<SourceHealth[]>([
+    { label: "Countries", status: "cache" },
+    { label: "Outbreaks", status: "cache" },
+    { label: "Interpol", status: "cache" },
+    { label: "Cyber", status: "cache" },
+  ]);
   const [layers, setLayers] = useState<LayerState>(initialLayers);
   const [hoveredCountry, setHoveredCountry] = useState<string | undefined>();
   const [lockedCountry, setLockedCountry] = useState<string | undefined>();
@@ -257,9 +272,13 @@ export function DangerMap() {
   const [nightVision, setNightVision] = useState(false);
   const [satelliteFlash, setSatelliteFlash] = useState(false);
   const [timeIndex, setTimeIndex] = useState(29);
+  const [replayActive, setReplayActive] = useState(false);
+  const [replayIndex, setReplayIndex] = useState(23);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [tickerSelection, setTickerSelection] = useState<TickerSelection>();
   const [loadError, setLoadError] = useState<string | undefined>();
   const mapRef = useRef<L.Map | null>(null);
+  const voiceAlertRef = useRef("");
 
   const worldFeatures = useMemo(() => {
     const topology = countries110m as WorldTopology;
@@ -317,9 +336,13 @@ export function DangerMap() {
             setCyber(cyberResponse);
           }
 
-          return cyberResponse.source;
+          return {
+            source: cyberResponse.source,
+            fetchedAt: cyberResponse.fetchedAt,
+            hasError: Boolean(cyberResponse.error),
+          };
         })
-        .catch(() => "fallback" as const);
+        .catch(() => ({ source: "fallback" as const, fetchedAt: undefined, hasError: true }));
 
       const [countrySource, diseaseResult, interpolSource, cyberSource] = await Promise.all([
         countryPromise,
@@ -332,8 +355,19 @@ export function DangerMap() {
         setSourceNote(
           formatSourceNote(
             diseaseResult.updatedAt,
-            [countrySource, diseaseResult.source, interpolSource, cyberSource].includes("fallback"),
+            [countrySource, diseaseResult.source, interpolSource, cyberSource.source].includes("fallback"),
           ),
+        );
+        setSourceHealth(
+          buildSourceHealth({
+            countriesSource: countrySource,
+            diseaseSource: diseaseResult.source,
+            interpolSource,
+            cyberSource: cyberSource.source,
+            diseaseUpdatedAt: diseaseResult.updatedAt,
+            cyberFetchedAt: cyberSource.fetchedAt,
+            hasCyberError: cyberSource.hasError,
+          }),
         );
       }
     }
@@ -344,6 +378,18 @@ export function DangerMap() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!replayActive) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setReplayIndex((current) => (current >= 23 ? 0 : current + 1));
+    }, 1150);
+
+    return () => window.clearInterval(interval);
+  }, [replayActive]);
 
   const countriesByNumeric = useMemo(
     () =>
@@ -379,6 +425,28 @@ export function DangerMap() {
       defcon: calculateDefcon(scores, activeCases, interpol.total),
     };
   }, [cyber.total, disease, interpol.total, riskScores]);
+
+  useEffect(() => {
+    if (!soundEnabled || typeof window === "undefined" || !("speechSynthesis" in window)) {
+      return;
+    }
+
+    const alertKey = `${globalStats.defcon}-${activeCountry?.cca3 ?? "global"}`;
+
+    if (globalStats.defcon > 2 || voiceAlertRef.current === alertKey) {
+      return;
+    }
+
+    voiceAlertRef.current = alertKey;
+    const message = new SpeechSynthesisUtterance(
+      activeCountry ? `High risk detected in ${activeCountry.name}` : `Global DEFCON ${globalStats.defcon}`,
+    );
+    message.rate = 0.92;
+    message.pitch = 0.75;
+    message.volume = 0.35;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(message);
+  }, [activeCountry, globalStats.defcon, soundEnabled]);
 
   const countryStyle = useCallback(
     (featureValue?: Feature<Geometry, { name?: string }>): PathOptions => {
@@ -464,6 +532,15 @@ export function DangerMap() {
     }
   }, [countries]);
 
+  const selectCommandItem = useCallback(
+    (item: CommandPaletteItem) => {
+      if (item.countryCode && countries[item.countryCode]) {
+        selectCountry(item.countryCode);
+      }
+    },
+    [countries, selectCountry],
+  );
+
   const diseaseMarkers = useMemo(
     () =>
       Object.values(disease)
@@ -496,9 +573,14 @@ export function DangerMap() {
     [countries, interpol.counts],
   );
 
+  const visibleCyberCounts = useMemo(
+    () => getReplayCyberCounts(cyber.incidents, cyber.counts, replayActive, replayIndex),
+    [cyber.counts, cyber.incidents, replayActive, replayIndex],
+  );
+
   const cyberMarkers = useMemo(
     () =>
-      Object.entries(cyber.counts).flatMap(([cca3, count]) => {
+      Object.entries(visibleCyberCounts).flatMap(([cca3, count]) => {
         const country = countries[cca3];
 
         if (!country || count <= 0) {
@@ -512,7 +594,53 @@ export function DangerMap() {
           point,
         }));
       }).slice(0, 220),
-    [countries, cyber.counts],
+    [countries, visibleCyberCounts],
+  );
+
+  const cyberHeatTrails = useMemo(
+    () =>
+      cyberMarkers.slice(0, 70).map((marker) => ({
+        ...marker,
+        radius: Math.min(30, 12 + marker.count * 4),
+      })),
+    [cyberMarkers],
+  );
+
+  const attackLines = useMemo(
+    () =>
+      cyber.incidents
+        .slice(0, replayActive ? Math.max(1, replayIndex + 1) : 18)
+        .map((incident) => {
+          const source = countries[incident.countryCode];
+          const target = getLikelyAttackTarget(incident, countries);
+
+          if (!source || !target) {
+            return undefined;
+          }
+
+          return {
+            id: `attack-${incident.id}`,
+            positions: [
+              [source.latlng[0], source.latlng[1]],
+              [(source.latlng[0] + target.latlng[0]) / 2 + 18, (source.latlng[1] + target.latlng[1]) / 2],
+              [target.latlng[0], target.latlng[1]],
+            ] as [number, number][],
+            attacks: incident.attacks ?? 1,
+          };
+        })
+        .filter((line): line is { id: string; positions: [number, number][]; attacks: number } => Boolean(line))
+        .slice(0, 24),
+    [countries, cyber.incidents, replayActive, replayIndex],
+  );
+
+  const diseaseCounts = useMemo(
+    () => Object.fromEntries(Object.entries(disease).map(([code, record]) => [code, record.reportCount ?? record.active])),
+    [disease],
+  );
+
+  const commandItems = useMemo(
+    () => buildCommandPaletteItems({ countries, disease, cyber, interpol }),
+    [countries, cyber, disease, interpol],
   );
 
   const corridorLines = useMemo(() => {
@@ -605,6 +733,21 @@ export function DangerMap() {
             : null}
 
           {layers.cyber
+            ? cyberHeatTrails.map((marker) => (
+                <CircleMarker
+                  center={[marker.point[1], marker.point[0]]}
+                  className="cyber-heat-trail"
+                  color="#00d4ff"
+                  fillColor="#00d4ff"
+                  fillOpacity={0.08}
+                  key={`${marker.id}-heat`}
+                  radius={marker.radius}
+                  stroke={false}
+                />
+              ))
+            : null}
+
+          {layers.cyber
             ? cyberMarkers.map((marker) => (
                 <CircleMarker
                   center={[marker.point[1], marker.point[0]]}
@@ -622,6 +765,19 @@ export function DangerMap() {
                     Cyber reports: {marker.count}
                   </Popup>
                 </CircleMarker>
+              ))
+            : null}
+
+          {layers.cyber
+            ? attackLines.map((line) => (
+                <Polyline
+                  className="attack-arc-line"
+                  color="#ff0040"
+                  key={line.id}
+                  opacity={0.52}
+                  positions={line.positions}
+                  weight={Math.min(4, 1 + line.attacks / 4500)}
+                />
               ))
             : null}
 
@@ -645,7 +801,13 @@ export function DangerMap() {
         onNightVisionToggle={() => setNightVision((current) => !current)}
         onToggle={toggleLayer}
       />
-      <StatsHUD stats={globalStats} sourceNote={sourceNote} />
+      <CommandPalette
+        items={commandItems}
+        onOpenChange={setCommandPaletteOpen}
+        onSelect={selectCommandItem}
+        open={commandPaletteOpen}
+      />
+      <StatsHUD stats={globalStats} sourceNote={sourceNote} sources={sourceHealth} />
       <IntelCard
         country={activeCountry}
         countryLookup={countries}
@@ -661,6 +823,9 @@ export function DangerMap() {
       />
       <ComparisonPanel
         countries={comparisonCountries}
+        cyberCounts={visibleCyberCounts}
+        diseaseCounts={diseaseCounts}
+        interpolCounts={interpol.counts}
         onClose={() => setCompareCodes([])}
         riskScores={riskScores}
       />
@@ -683,6 +848,25 @@ export function DangerMap() {
           type="range"
           value={timeIndex}
         />
+        <div className="replay-row" aria-label="Incident replay controls">
+          <button
+            type="button"
+            onClick={() => {
+              setReplayActive((current) => {
+                if (current) {
+                  setReplayIndex(23);
+                  return false;
+                }
+
+                setReplayIndex(0);
+                return true;
+              });
+            }}
+          >
+            {replayActive ? "Pause replay" : "Replay incidents"}
+          </button>
+          <span>Hour {replayIndex + 1}/24</span>
+        </div>
       </DraggablePanel>
       <ThreatTicker
         cyber={cyber}

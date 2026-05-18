@@ -3,7 +3,9 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { X } from "lucide-react";
+import { useMemo, useState } from "react";
 
+import { calculateSimulatedRisk, type SimulationState } from "@/lib/commandCenter";
 import { formatCompactNumber, formatNumber } from "@/lib/geoUtils";
 import { getRiskBand, getRiskColor } from "@/lib/riskCalculator";
 import type { CountryIntel, DiseaseRecord } from "@/types/risk";
@@ -33,6 +35,12 @@ export function IntelCard({
   onSelectCountry,
 }: IntelCardProps) {
   const open = Boolean(country);
+  const [simulation, setSimulation] = useState<SimulationState>({
+    borderLockdown: false,
+    cvePatch: false,
+    outbreakResponse: false,
+  });
+  const simulatedRisk = useMemo(() => calculateSimulatedRisk(riskScore, simulation), [riskScore, simulation]);
   const diseaseUpdatedAt = disease?.updatedAt
     ? new Intl.DateTimeFormat("en", {
         month: "short",
@@ -81,6 +89,34 @@ export function IntelCard({
             </div>
             <div className="risk-meter mt-3" aria-hidden="true">
               <span style={{ width: `${riskScore}%` }} />
+            </div>
+
+            <div className="simulator-panel" aria-label="Country lockdown simulator">
+              <div>
+                <p className="stat-label">Lockdown Simulator</p>
+                <p className="data-font text-xs text-[#7a8da0]">Simulated risk: {simulatedRisk}</p>
+              </div>
+              <div className="simulator-toggles">
+                {[
+                  ["borderLockdown", "Border lockdown"],
+                  ["cvePatch", "Patch CVEs"],
+                  ["outbreakResponse", "Outbreak response"],
+                ].map(([key, label]) => (
+                  <label key={key}>
+                    <input
+                      type="checkbox"
+                      checked={simulation[key as keyof SimulationState]}
+                      onChange={(event) =>
+                        setSimulation((current) => ({
+                          ...current,
+                          [key]: event.target.checked,
+                        }))
+                      }
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
             </div>
 
             <div className="intel-grid">
