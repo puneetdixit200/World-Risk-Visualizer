@@ -79,16 +79,6 @@ button {
   transition: transform 900ms ease, filter 600ms ease;
 }
 
-.threat-scene-canvas {
-  position: fixed;
-  inset: 0;
-  z-index: 8;
-  width: 100vw;
-  height: 100vh;
-  pointer-events: none;
-  opacity: 0.92;
-}
-
 .map-stage.satellite-drop {
   transform: perspective(900px) rotateX(3deg) scale(1.03);
   filter: contrast(1.2) brightness(1.12);

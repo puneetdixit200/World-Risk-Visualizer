@@ -16,7 +16,6 @@ import { IntelCard } from "@/components/IntelCard";
 import { LayerTogglePanel } from "@/components/LayerTogglePanel";
 import { MapZoomControls } from "@/components/MapZoomControls";
 import { StatsHUD } from "@/components/StatsHUD";
-import { ThreatScene3D } from "@/components/ThreatScene3D";
 import { ThreatTicker } from "@/components/ThreatTicker";
 import {
   createDeterministicScatter,
@@ -26,6 +25,7 @@ import {
   scaleCircleRadius,
   scaleOutbreakRadius,
 } from "@/lib/geoUtils";
+import { fallbackCyber } from "@/lib/fallbackData";
 import { calculateDefcon, calculateRiskByCountry, getRiskColor } from "@/lib/riskCalculator";
 import type {
   CountryIntel,
@@ -248,14 +248,7 @@ export function DangerMap() {
     source: "fallback",
     fetchedAt: new Date().toISOString(),
   });
-  const [cyber, setCyber] = useState<CyberFeed>({
-    counts: {},
-    incidents: [],
-    vulnerabilities: [],
-    total: 0,
-    source: "fallback",
-    fetchedAt: new Date().toISOString(),
-  });
+  const [cyber, setCyber] = useState<CyberFeed>(fallbackCyber);
   const [sourceNote, setSourceNote] = useState("Live cache");
   const [layers, setLayers] = useState<LayerState>(initialLayers);
   const [hoveredCountry, setHoveredCountry] = useState<string | undefined>();
@@ -645,7 +638,6 @@ export function DangerMap() {
         </MapContainer>
       </div>
 
-      <ThreatScene3D activeRisk={activeRisk} density={interpolDots.length + cyberMarkers.length} />
       <MapZoomControls mapRef={mapRef} onSoundToggle={toggleSound} soundEnabled={soundEnabled} />
       <LayerTogglePanel
         layers={layers}

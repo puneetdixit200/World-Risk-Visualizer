@@ -12,7 +12,7 @@ test("renders the command center map and interactive controls", async ({ page })
   await expect(page.locator(".ticker")).toBeVisible();
   await expect(page.locator(".country-path").first()).toBeVisible();
   await expect(page.getByLabel("Map zoom controls")).toBeVisible();
-  await expect(page.locator(".threat-scene-canvas")).toBeVisible();
+  await expect(page.locator(".threat-scene-canvas")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Cyber Attacks" })).toBeVisible();
   await expect(page.getByRole("button", { name: "FBI Overlay" })).toHaveCount(0);
   await expect(page.locator(".cyber-pulse").first()).toBeVisible();
@@ -46,23 +46,6 @@ test("renders the command center map and interactive controls", async ({ page })
     }).length,
   );
   expect(longHorizontalBands).toBe(0);
-
-  const has3DPixels = await page.locator(".threat-scene-canvas").evaluate((canvas) => {
-    const element = canvas as HTMLCanvasElement;
-    const gl = element.getContext("webgl2", { preserveDrawingBuffer: true }) ?? element.getContext("webgl", { preserveDrawingBuffer: true });
-    if (!gl || element.width === 0 || element.height === 0) {
-      return false;
-    }
-    const pixels = new Uint8Array(element.width * element.height * 4);
-    gl.readPixels(0, 0, element.width, element.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-    for (let index = 3; index < pixels.length; index += 24) {
-      if (pixels[index] > 0) {
-        return true;
-      }
-    }
-    return false;
-  });
-  expect(has3DPixels).toBe(true);
 
   await page.getByLabel("Toggle night vision").click();
   await expect(page.locator("main.danger-shell")).toHaveClass(/night-vision/);
