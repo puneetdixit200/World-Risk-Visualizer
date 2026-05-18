@@ -1,4 +1,4 @@
-import type { FbiEntry, InterpolAggregate, RestCountryRecord } from "@/types/risk";
+import type { CyberFeed, InterpolAggregate, RestCountryRecord } from "@/types/risk";
 
 import { normalizeCountries, normalizeDisease } from "./normalizers";
 
@@ -147,29 +147,62 @@ export const fallbackInterpol: InterpolAggregate = {
   error: "Interpol upstream blocked this runtime; showing seeded aggregate fallback.",
 };
 
-export const fallbackFbi: FbiEntry[] = [
-  {
-    id: "fallback-fbi-1",
-    name: "MONICA ELFRIEDE WITT",
-    description: "Conspiracy to deliver national defense information to representatives of a foreign government",
-    reward: "Reward up to $200,000",
-    url: "https://www.fbi.gov/wanted/counterintelligence/monica-elfriede-witt",
-    subjects: ["Counterintelligence"],
+export const fallbackCyber: CyberFeed = {
+  counts: {
+    USA: 4,
+    FRA: 2,
+    IND: 3,
+    RUS: 2,
   },
-  {
-    id: "fallback-fbi-2",
-    name: "BOB TANG",
-    description: "Unlawful flight to avoid prosecution - murder",
-    reward: "Reward up to $10,000",
-    url: "https://www.fbi.gov/wanted/murders/bob-tang",
-    subjects: ["Violent Crime"],
-  },
-  {
-    id: "fallback-fbi-3",
-    name: "VANESSA O'ROURKE",
-    description: "Wire fraud",
-    reward: "Reward undisclosed",
-    url: "https://www.fbi.gov/wanted/wcc/vanessa-orourke",
-    subjects: ["White-Collar Crime"],
-  },
-];
+  incidents: [
+    {
+      kind: "CYBER",
+      id: "fallback-cyber-1",
+      title: "Ransomware activity reported against healthcare systems",
+      country: "United States",
+      countryCode: "USA",
+      source: "GDELT fallback",
+      seenAt: new Date().toISOString(),
+      url: "https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/",
+    },
+    {
+      kind: "CYBER",
+      id: "fallback-cyber-2",
+      title: "DDoS disruption reported against telecom infrastructure",
+      country: "France",
+      countryCode: "FRA",
+      source: "GDELT fallback",
+      seenAt: new Date().toISOString(),
+      url: "https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/",
+    },
+    {
+      kind: "CYBER",
+      id: "fallback-cyber-3",
+      title: "Data breach coverage detected across regional outlets",
+      country: "India",
+      countryCode: "IND",
+      source: "GDELT fallback",
+      seenAt: new Date().toISOString(),
+      url: "https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/",
+    },
+  ],
+  vulnerabilities: [
+    {
+      kind: "CISA KEV",
+      id: "CVE-FALLBACK-1",
+      cve: "CVE-FALLBACK-1",
+      vendor: "Multiple vendors",
+      product: "Internet-facing systems",
+      name: "Known exploited vulnerability catalog fallback",
+      dateAdded: new Date().toISOString().slice(0, 10),
+      ransomware: "Unknown",
+      action: "Review CISA KEV guidance and prioritize remediation.",
+      url: "https://www.cisa.gov/known-exploited-vulnerabilities-catalog",
+    },
+  ],
+  total: 11,
+  source: "fallback",
+  fetchedAt: new Date().toISOString(),
+  cisaCatalogVersion: "fallback",
+  error: "Cyber upstream unavailable; showing seeded incident fallback.",
+};

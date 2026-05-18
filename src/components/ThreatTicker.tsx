@@ -1,19 +1,24 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-
 import { ExternalLink, X } from "lucide-react";
 
-import type { FbiEntry, InterpolNotice } from "@/types/risk";
+import type { CyberFeed, InterpolNotice } from "@/types/risk";
 
 type TickerItem =
   | {
-      kind: "FBI";
+      kind: "CYBER";
       id: string;
       name: string;
       description: string;
-      reward: string;
-      image?: string;
+      meta: string;
+      url?: string;
+    }
+  | {
+      kind: "CISA KEV";
+      id: string;
+      name: string;
+      description: string;
+      meta: string;
       url: string;
     }
   | {
@@ -21,27 +26,50 @@ type TickerItem =
       id: string;
       name: string;
       description: string;
-      reward: string;
+      meta: string;
       url?: string;
     };
 
 type ThreatTickerProps = {
-  fbi: FbiEntry[];
+  cyber: CyberFeed;
   interpol: InterpolNotice[];
   selected?: TickerItem;
   onSelect: (item: TickerItem) => void;
   onClose: () => void;
 };
 
-function toTickerItems(fbi: FbiEntry[], interpol: InterpolNotice[]) {
-  const fbiItems: TickerItem[] = fbi.slice(0, 18).map((entry) => ({
-    kind: "FBI",
-    id: entry.id,
-    name: entry.name,
-    description: entry.description,
-    reward: entry.reward,
-    image: entry.image,
-    url: entry.url,
+function formatTickerDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Recent";
+  }
+
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function toTickerItems(cyber: CyberFeed, interpol: InterpolNotice[]) {
+  const cyberItems: TickerItem[] = cyber.incidents.slice(0, 16).map((incident) => ({
+    kind: "CYBER",
+    id: incident.id,
+    name: incident.title,
+    description: `${incident.country} | ${incident.source}`,
+    meta: formatTickerDate(incident.seenAt),
+    url: incident.url,
+  }));
+
+  const kevItems: TickerItem[] = cyber.vulnerabilities.slice(0, 10).map((vulnerability) => ({
+    kind: "CISA KEV",
+    id: vulnerability.id,
+    name: vulnerability.cve,
+    description: `${vulnerability.vendor} ${vulnerability.product}: ${vulnerability.name}`,
+    meta: vulnerability.ransomware === "Known" ? "Ransomware-linked" : vulnerability.dateAdded,
+    url: vulnerability.url,
   }));
 
   const interpolItems: TickerItem[] = interpol.slice(0, 18).map((notice) => ({
@@ -49,15 +77,15 @@ function toTickerItems(fbi: FbiEntry[], interpol: InterpolNotice[]) {
     id: notice.id,
     name: notice.name,
     description: notice.charges,
-    reward: notice.nationalities.join(", ") || "Nationality unknown",
+    meta: notice.nationalities.join(", ") || "Nationality unknown",
     url: notice.url,
   }));
 
-  return [...fbiItems, ...interpolItems];
+  return [...cyberItems, ...kevItems, ...interpolItems];
 }
 
-export function ThreatTicker({ fbi, interpol, selected, onSelect, onClose }: ThreatTickerProps) {
-  const items = toTickerItems(fbi, interpol);
+export function ThreatTicker({ cyber, interpol, selected, onSelect, onClose }: ThreatTickerProps) {
+  const items = toTickerItems(cyber, interpol);
   const marqueeItems = items.length ? [...items, ...items] : [];
 
   return (
@@ -68,7 +96,7 @@ export function ThreatTicker({ fbi, interpol, selected, onSelect, onClose }: Thr
             <button className="ticker-item" type="button" key={`${item.kind}-${item.id}-${index}`} onClick={() => onSelect(item)}>
               <span className="ticker-source">{item.kind}</span>
               <span>{item.name}</span>
-              <span className="text-[#7a8da0]">{item.reward}</span>
+              <span className="text-[#7a8da0]">{item.meta}</span>
             </button>
           ))}
         </div>
@@ -85,11 +113,8 @@ export function ThreatTicker({ fbi, interpol, selected, onSelect, onClose }: Thr
               <X size={17} />
             </button>
           </div>
-          {"image" in selected && selected.image ? (
-            <img className="ticker-image" src={selected.image} alt={selected.name} />
-          ) : null}
           <p className="text-sm text-[#d8e4ee]">{selected.description}</p>
-          <p className="data-font mt-3 text-xs uppercase text-[#ff8c00]">{selected.reward}</p>
+          <p className="data-font mt-3 text-xs uppercase text-[#ff8c00]">{selected.meta}</p>
           {selected.url ? (
             <a className="mt-4 inline-flex items-center gap-2 text-sm text-[#00d4ff]" href={selected.url} target="_blank" rel="noreferrer">
               Open source record <ExternalLink size={14} />

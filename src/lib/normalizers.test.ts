@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   aggregateInterpolNotices,
   normalizeCountries,
+  normalizeCyberFeed,
   normalizeDisease,
-  normalizeFbi,
 } from "./normalizers";
 
 describe("normalizers", () => {
@@ -67,24 +67,82 @@ describe("normalizers", () => {
     expect(aggregate.total).toBe(2);
   });
 
-  it("normalizes FBI wanted entries for ticker and popup use", () => {
-    const entries = normalizeFbi([
+  it("normalizes cyber articles and exploited vulnerabilities for map and ticker use", () => {
+    const countries = normalizeCountries([
       {
-        uid: "abc",
-        title: "JANE DOE",
-        description: "Wire Fraud",
-        reward_text: "Reward up to $10,000",
-        url: "https://fbi.gov/jane",
-        images: [{ thumb: "thumb.jpg", large: "large.jpg" }],
-        subjects: ["White-Collar Crime"],
+        name: { common: "United States", official: "United States of America" },
+        cca2: "US",
+        cca3: "USA",
+        ccn3: "840",
+        population: 334_805_269,
+        area: 9_833_517,
+        borders: ["CAN", "MEX"],
+        flags: { svg: "https://flagcdn.com/us.svg" },
+        latlng: [38, -97],
+        region: "Americas",
+      },
+      {
+        name: { common: "Switzerland", official: "Swiss Confederation" },
+        cca2: "CH",
+        cca3: "CHE",
+        ccn3: "756",
+        population: 8_900_000,
+        area: 41_285,
+        borders: ["AUT", "FRA", "ITA", "LIE", "DEU"],
+        flags: { svg: "https://flagcdn.com/ch.svg" },
+        latlng: [47, 8],
+        region: "Europe",
       },
     ]);
 
-    expect(entries[0]).toMatchObject({
-      id: "abc",
-      name: "JANE DOE",
-      reward: "Reward up to $10,000",
-      image: "large.jpg",
+    const feed = normalizeCyberFeed(
+      [
+        {
+          title: "DDoS attack disrupts telecom services",
+          sourcecountry: "Switzerland",
+          seendate: "20260518T090000Z",
+          url: "https://example.com/ddos",
+          domain: "example.com",
+        },
+        {
+          title: "Ransomware group hits hospital network",
+          sourceCountry: "United States",
+          seendate: "20260518T080000Z",
+          url: "https://example.com/ransomware",
+        },
+      ],
+      {
+        catalogVersion: "2026.05.15",
+        dateReleased: "2026-05-15T16:55:06.6086Z",
+        vulnerabilities: [
+          {
+            cveID: "CVE-2026-42897",
+            vendorProject: "Microsoft",
+            product: "Windows",
+            vulnerabilityName: "Microsoft Windows Exploited Vulnerability",
+            dateAdded: "2026-05-15",
+            knownRansomwareCampaignUse: "Unknown",
+            requiredAction: "Apply mitigations per vendor instructions.",
+          },
+        ],
+      },
+      countries,
+    );
+
+    expect(feed.counts.CHE).toBe(1);
+    expect(feed.counts.USA).toBe(1);
+    expect(feed.incidents[0]).toMatchObject({
+      kind: "CYBER",
+      countryCode: "CHE",
+      country: "Switzerland",
+      title: "DDoS attack disrupts telecom services",
+      source: "example.com",
+    });
+    expect(feed.vulnerabilities[0]).toMatchObject({
+      kind: "CISA KEV",
+      cve: "CVE-2026-42897",
+      vendor: "Microsoft",
+      product: "Windows",
     });
   });
 });

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { fallbackDisease } from "@/lib/fallbackData";
 import { normalizeDisease, type RawDiseaseCountry, type RawDiseaseHistory } from "@/lib/normalizers";
 
-export const revalidate = 3600;
+export const revalidate = 300;
 
 const CURRENT_URL = "https://disease.sh/v3/covid-19/countries?allowNull=false";
 const HISTORICAL_URL = "https://disease.sh/v3/covid-19/historical?lastdays=30";
@@ -40,17 +40,23 @@ export async function GET() {
     }
 
     const current = (await currentResponse.json()) as RawDiseaseCountry[];
+    const latestUpdate = current
+      .map((record) => record.updated ?? 0)
+      .filter((value) => Number.isFinite(value))
+      .reduce((latest, value) => Math.max(latest, value), 0);
 
     return NextResponse.json({
       disease: normalizeDisease(current, historical),
       source: "live",
       fetchedAt: new Date().toISOString(),
+      updatedAt: latestUpdate ? new Date(latestUpdate).toISOString() : undefined,
     });
   } catch (error) {
     return NextResponse.json({
       disease: fallbackDisease,
       source: "fallback",
       fetchedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       error: error instanceof Error ? error.message : "Unable to fetch disease data.",
     });
   }

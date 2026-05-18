@@ -56,6 +56,7 @@ export type DiseaseRecord = {
   lat: number;
   lng: number;
   trend: number[];
+  updatedAt?: string;
 };
 
 export type InterpolNotice = {
@@ -75,23 +76,50 @@ export type InterpolAggregate = {
   error?: string;
 };
 
-export type FbiEntry = {
+export type CyberIncident = {
+  kind: "CYBER";
   id: string;
+  title: string;
+  country: string;
+  countryCode: string;
+  source: string;
+  seenAt: string;
+  url?: string;
+};
+
+export type CyberVulnerability = {
+  kind: "CISA KEV";
+  id: string;
+  cve: string;
+  vendor: string;
+  product: string;
   name: string;
-  description: string;
-  reward: string;
+  dateAdded: string;
+  ransomware: string;
+  action: string;
   url: string;
-  image?: string;
-  subjects: string[];
+};
+
+export type CyberFeed = {
+  counts: Record<string, number>;
+  incidents: CyberIncident[];
+  vulnerabilities: CyberVulnerability[];
+  total: number;
+  source: "live" | "fallback";
+  fetchedAt: string;
+  cisaCatalogVersion?: string;
+  cisaReleasedAt?: string;
+  error?: string;
 };
 
 export type GlobalStats = {
   interpolTotal: number;
   activeCases: number;
+  cyberIncidents: number;
   highRiskCountries: number;
   defcon: number;
 };
 
-export type LayerKey = "threat" | "disease" | "interpol" | "fbi" | "density" | "corridors";
+export type LayerKey = "threat" | "disease" | "interpol" | "cyber" | "density" | "corridors";
 
 export type LayerState = Record<LayerKey, boolean>;

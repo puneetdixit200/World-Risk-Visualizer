@@ -14,6 +14,7 @@ import { Sparkline } from "./Sparkline";
 type IntelCardProps = {
   country?: CountryIntel;
   disease?: DiseaseRecord;
+  cyberCount: number;
   interpolCount: number;
   riskScore: number;
   countryLookup: Record<string, CountryIntel>;
@@ -24,6 +25,7 @@ type IntelCardProps = {
 export function IntelCard({
   country,
   disease,
+  cyberCount,
   interpolCount,
   riskScore,
   countryLookup,
@@ -31,6 +33,14 @@ export function IntelCard({
   onSelectCountry,
 }: IntelCardProps) {
   const open = Boolean(country);
+  const diseaseUpdatedAt = disease?.updatedAt
+    ? new Intl.DateTimeFormat("en", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date(disease.updatedAt))
+    : "Live feed";
 
   return (
     <DraggablePanel
@@ -90,6 +100,10 @@ export function IntelCard({
                 <p className="stat-label">Interpol</p>
                 <p className="stat-value text-[#ff8c00]">{interpolCount}</p>
               </div>
+              <div className="intel-cell">
+                <p className="stat-label">Cyber Reports</p>
+                <p className="stat-value text-[#00d4ff]">{cyberCount}</p>
+              </div>
             </div>
 
             <div className="intel-cell mt-3">
@@ -98,7 +112,7 @@ export function IntelCard({
                   <p className="stat-label">Active Disease Cases</p>
                   <p className="stat-value text-[#ff0040]">{formatCompactNumber(disease?.active ?? 0)}</p>
                 </div>
-                <p className="data-font text-[10px] uppercase text-[#7a8da0]">30D Trend</p>
+                <p className="data-font text-[10px] uppercase text-[#7a8da0]">{diseaseUpdatedAt}</p>
               </div>
               <Sparkline data={disease?.trend ?? []} color="#ff0040" />
             </div>

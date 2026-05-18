@@ -1,7 +1,9 @@
 import type {
   CountryIntel,
+  CyberFeed,
+  CyberIncident,
+  CyberVulnerability,
   DiseaseRecord,
-  FbiEntry,
   InterpolAggregate,
   InterpolNotice,
   RestCountryRecord,
@@ -17,6 +19,7 @@ export type RawDiseaseCountry = {
   cases?: number;
   deaths?: number;
   recovered?: number;
+  updated?: number;
   countryInfo?: {
     iso2?: string;
     iso3?: string;
@@ -31,6 +34,12 @@ export type RawDiseaseHistory = {
   timeline?: {
     cases?: Record<string, number>;
   };
+};
+
+export type RawCisaKevCatalog = {
+  catalogVersion?: string;
+  dateReleased?: string;
+  vulnerabilities?: JsonRecord[];
 };
 
 export function normalizeCountries(rawCountries: RestCountryRecord[]) {
@@ -102,6 +111,7 @@ export function normalizeDisease(current: RawDiseaseCountry[], historical: RawDi
       lat: raw.countryInfo?.lat ?? 0,
       lng: raw.countryInfo?.long ?? 0,
       trend: trendsByName.get(normalizeCountryName(raw.country)) ?? [],
+      updatedAt: raw.updated ? new Date(raw.updated).toISOString() : undefined,
     };
 
     return records;
@@ -118,6 +128,125 @@ function getOptionalString(value: unknown) {
 
 function getStringArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function parseGdeltSeenDate(value: string) {
+  const compactMatch = value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
+
+  if (compactMatch) {
+    const [, year, month, day, hour, minute, second] = compactMatch;
+    return `${year}-${month}-${day}T${hour}:${minute}:${second}Z`;
+  }
+
+  return value;
+}
+
+function createCountryNameLookup(countries: Record<string, CountryIntel>) {
+  const entries = Object.values(countries).flatMap((country) => [
+    [normalizeCountryName(country.name), country] as const,
+    [normalizeCountryName(country.officialName), country] as const,
+  ]);
+
+  return new Map(entries);
+}
+
+function getCyberCountry(raw: JsonRecord, lookup: Map<string, CountryIntel>) {
+  const sourceCountry = getString(raw.sourcecountry) || getString(raw.sourceCountry) || getString(raw.country);
+
+  if (!sourceCountry) {
+    return undefined;
+  }
+
+  return lookup.get(normalizeCountryName(sourceCountry));
+}
+
+function getCyberSource(raw: JsonRecord) {
+  const domain = getString(raw.domain);
+  const source = getString(raw.source);
+  const url = getString(raw.url);
+
+  if (domain) {
+    return domain;
+  }
+
+  if (source) {
+    return source;
+  }
+
+  try {
+    return url ? new URL(url).hostname.replace(/^www\./, "") : "GDELT";
+  } catch {
+    return "GDELT";
+  }
+}
+
+export function normalizeCyberFeed(
+  rawArticles: JsonRecord[],
+  rawKev: RawCisaKevCatalog,
+  countries: Record<string, CountryIntel>,
+): CyberFeed {
+  const lookup = createCountryNameLookup(countries);
+  const counts: Record<string, number> = {};
+  const seenUrls = new Set<string>();
+  const incidents: CyberIncident[] = [];
+
+  rawArticles.forEach((raw, index) => {
+    const country = getCyberCountry(raw, lookup);
+    const title = getString(raw.title, "Reported cyber incident");
+    const url = getOptionalString(raw.url);
+
+    if (!country || !title || (url && seenUrls.has(url))) {
+      return;
+    }
+
+    if (url) {
+      seenUrls.add(url);
+    }
+
+    counts[country.cca3] = (counts[country.cca3] ?? 0) + 1;
+    incidents.push({
+      kind: "CYBER",
+      id: getString(raw.url, `cyber-${index}`),
+      title,
+      country: country.name,
+      countryCode: country.cca3,
+      source: getCyberSource(raw),
+      seenAt: parseGdeltSeenDate(getString(raw.seendate) || getString(raw.seenDate) || new Date().toISOString()),
+      url,
+    });
+  });
+
+  const vulnerabilities: CyberVulnerability[] = (rawKev.vulnerabilities ?? [])
+    .slice()
+    .sort((left, right) => getString(right.dateAdded).localeCompare(getString(left.dateAdded)))
+    .slice(0, 24)
+    .map((raw, index) => {
+      const cve = getString(raw.cveID, `CVE-${index}`);
+
+      return {
+        kind: "CISA KEV",
+        id: cve,
+        cve,
+        vendor: getString(raw.vendorProject, "Unknown vendor"),
+        product: getString(raw.product, "Unknown product"),
+        name: getString(raw.vulnerabilityName, "Known exploited vulnerability"),
+        dateAdded: getString(raw.dateAdded, ""),
+        ransomware: getString(raw.knownRansomwareCampaignUse, "Unknown"),
+        action: stripHtml(raw.requiredAction) || "Apply mitigations per vendor instructions.",
+        url: "https://www.cisa.gov/known-exploited-vulnerabilities-catalog",
+      };
+    });
+
+  return {
+    counts,
+    incidents: incidents.slice(0, 120),
+    vulnerabilities,
+    total: incidents.length,
+    source: "live",
+    fetchedAt: new Date().toISOString(),
+    cisaCatalogVersion: rawKev.catalogVersion,
+    cisaReleasedAt: rawKev.dateReleased,
+  };
 }
 
 function getInterpolName(raw: JsonRecord) {
@@ -184,26 +313,4 @@ function stripHtml(value: unknown) {
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function getFbiImage(images: unknown) {
-  if (!Array.isArray(images)) {
-    return undefined;
-  }
-
-  const first = images.find((image) => typeof image === "object" && image) as JsonRecord | undefined;
-
-  return first ? getString(first.large) || getString(first.original) || getString(first.thumb) || undefined : undefined;
-}
-
-export function normalizeFbi(rawItems: JsonRecord[]): FbiEntry[] {
-  return rawItems.map((raw, index) => ({
-    id: getString(raw.uid, `fbi-${index}`),
-    name: getString(raw.title, "UNKNOWN SUBJECT"),
-    description: stripHtml(raw.description) || stripHtml(raw.caution) || "Federal wanted listing",
-    reward: getString(raw.reward_text, "Reward undisclosed"),
-    url: getString(raw.url, "https://www.fbi.gov/wanted"),
-    image: getFbiImage(raw.images),
-    subjects: getStringArray(raw.subjects),
-  }));
 }

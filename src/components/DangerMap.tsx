@@ -28,8 +28,8 @@ import {
 import { calculateDefcon, calculateRiskByCountry, getRiskColor } from "@/lib/riskCalculator";
 import type {
   CountryIntel,
+  CyberFeed,
   DiseaseRecord,
-  FbiEntry,
   InterpolAggregate,
   LayerKey,
   LayerState,
@@ -53,12 +53,8 @@ type CountriesResponse = {
 type DiseaseResponse = {
   disease: Record<string, DiseaseRecord>;
   source: "live" | "fallback";
-  error?: string;
-};
-
-type FbiResponse = {
-  fbi: FbiEntry[];
-  source: "live" | "fallback";
+  fetchedAt?: string;
+  updatedAt?: string;
   error?: string;
 };
 
@@ -68,7 +64,7 @@ const initialLayers: LayerState = {
   threat: true,
   disease: true,
   interpol: true,
-  fbi: true,
+  cyber: true,
   density: false,
   corridors: true,
 };
@@ -108,6 +104,19 @@ function densityColor(density: number) {
   }
 
   return "#101820";
+}
+
+function formatSourceNote(diseaseUpdatedAt: string | undefined, hasFallback: boolean) {
+  const status = hasFallback ? "Mixed live/fallback" : "Live feeds";
+
+  if (!diseaseUpdatedAt) {
+    return status;
+  }
+
+  return `${status} | Disease ${new Intl.DateTimeFormat("en", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(diseaseUpdatedAt))}`;
 }
 
 function useImmersiveAudio(activeRisk: number) {
@@ -238,7 +247,14 @@ export function DangerMap() {
     source: "fallback",
     fetchedAt: new Date().toISOString(),
   });
-  const [fbi, setFbi] = useState<FbiEntry[]>([]);
+  const [cyber, setCyber] = useState<CyberFeed>({
+    counts: {},
+    incidents: [],
+    vulnerabilities: [],
+    total: 0,
+    source: "fallback",
+    fetchedAt: new Date().toISOString(),
+  });
   const [sourceNote, setSourceNote] = useState("Live cache");
   const [layers, setLayers] = useState<LayerState>(initialLayers);
   const [hoveredCountry, setHoveredCountry] = useState<string | undefined>();
@@ -262,33 +278,69 @@ export function DangerMap() {
     let cancelled = false;
 
     async function loadFeeds() {
-      try {
-        const [countryResponse, diseaseResponse, interpolResponse, fbiResponse] = await Promise.all([
-          getJson<CountriesResponse>("/api/countries"),
-          getJson<DiseaseResponse>("/api/disease"),
-          getJson<InterpolAggregate>("/api/interpol"),
-          getJson<FbiResponse>("/api/fbi"),
-        ]);
+      const countryPromise = getJson<CountriesResponse>("/api/countries")
+        .then((countryResponse) => {
+          if (!cancelled) {
+            setCountries(countryResponse.countries);
+          }
 
-        if (cancelled) {
-          return;
-        }
+          return countryResponse.source;
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            setLoadError(error instanceof Error ? error.message : "Unable to load country data.");
+          }
 
-        setCountries(countryResponse.countries);
-        setDisease(diseaseResponse.disease);
-        setInterpol(interpolResponse);
-        setFbi(fbiResponse.fbi);
+          return "fallback" as const;
+        });
+
+      const diseasePromise = getJson<DiseaseResponse>("/api/disease")
+        .then((diseaseResponse) => {
+          if (!cancelled) {
+            setDisease(diseaseResponse.disease);
+          }
+
+          return {
+            source: diseaseResponse.source,
+            updatedAt: diseaseResponse.updatedAt ?? diseaseResponse.fetchedAt,
+          };
+        })
+        .catch(() => ({ source: "fallback" as const, updatedAt: undefined }));
+
+      const interpolPromise = getJson<InterpolAggregate>("/api/interpol")
+        .then((interpolResponse) => {
+          if (!cancelled) {
+            setInterpol(interpolResponse);
+          }
+
+          return interpolResponse.source;
+        })
+        .catch(() => "fallback" as const);
+
+      const cyberPromise = getJson<CyberFeed>("/api/cyber")
+        .then((cyberResponse) => {
+          if (!cancelled) {
+            setCyber(cyberResponse);
+          }
+
+          return cyberResponse.source;
+        })
+        .catch(() => "fallback" as const);
+
+      const [countrySource, diseaseResult, interpolSource, cyberSource] = await Promise.all([
+        countryPromise,
+        diseasePromise,
+        interpolPromise,
+        cyberPromise,
+      ]);
+
+      if (!cancelled) {
         setSourceNote(
-          [countryResponse.source, diseaseResponse.source, interpolResponse.source, fbiResponse.source].includes(
-            "fallback",
-          )
-            ? "Mixed live/fallback"
-            : "Live cache",
+          formatSourceNote(
+            diseaseResult.updatedAt,
+            [countrySource, diseaseResult.source, interpolSource, cyberSource].includes("fallback"),
+          ),
         );
-      } catch (error) {
-        if (!cancelled) {
-          setLoadError(error instanceof Error ? error.message : "Unable to load data feeds.");
-        }
       }
     }
 
@@ -328,10 +380,11 @@ export function DangerMap() {
     return {
       interpolTotal: interpol.total,
       activeCases,
+      cyberIncidents: cyber.total,
       highRiskCountries: scores.filter((score) => score >= 65).length,
       defcon: calculateDefcon(scores, activeCases, interpol.total),
     };
-  }, [disease, interpol.total, riskScores]);
+  }, [cyber.total, disease, interpol.total, riskScores]);
 
   const countryStyle = useCallback(
     (featureValue?: Feature<Geometry, { name?: string }>): PathOptions => {
@@ -449,13 +502,23 @@ export function DangerMap() {
     [countries, interpol.counts],
   );
 
-  const fbiMarkers = useMemo(
+  const cyberMarkers = useMemo(
     () =>
-      createDeterministicScatter([-98, 39], "FBI-MOST-WANTED", Math.min(fbi.length, 10)).map((point, index) => ({
-        point,
-        entry: fbi[index],
-      })),
-    [fbi],
+      Object.entries(cyber.counts).flatMap(([cca3, count]) => {
+        const country = countries[cca3];
+
+        if (!country || count <= 0) {
+          return [];
+        }
+
+        return createDeterministicScatter(country.center, `${cca3}-CYBER`, Math.min(count, 5)).map((point, index) => ({
+          id: `${cca3}-cyber-${index}`,
+          cca3,
+          count,
+          point,
+        }));
+      }).slice(0, 220),
+    [countries, cyber.counts],
   );
 
   const corridorLines = useMemo(() => {
@@ -547,38 +610,25 @@ export function DangerMap() {
               ))
             : null}
 
-          {layers.fbi
-            ? fbiMarkers.map(({ point, entry }, index) =>
-                entry ? (
-                  <CircleMarker
-                    center={[point[1], point[0]]}
-                    className="fbi-marker"
-                    color="#ff0000"
-                    fillColor="#ff0000"
-                    fillOpacity={0.72}
-                    key={entry.id}
-                    radius={6}
-                    weight={2}
-                  >
-                    <Popup>
-                      <strong>{entry.name}</strong>
-                      <br />
-                      {entry.description}
-                    </Popup>
-                  </CircleMarker>
-                ) : (
-                  <CircleMarker
-                    center={[point[1], point[0]]}
-                    className="fbi-marker"
-                    color="#ff0000"
-                    fillColor="#ff0000"
-                    fillOpacity={0.72}
-                    key={`fbi-empty-${index}`}
-                    radius={6}
-                    weight={2}
-                  />
-                ),
-              )
+          {layers.cyber
+            ? cyberMarkers.map((marker) => (
+                <CircleMarker
+                  center={[marker.point[1], marker.point[0]]}
+                  className="cyber-pulse"
+                  color="#00d4ff"
+                  fillColor="#9d4edd"
+                  fillOpacity={0.64}
+                  key={marker.id}
+                  radius={Math.min(12, 5 + marker.count * 1.2)}
+                  weight={2}
+                >
+                  <Popup>
+                    <strong>{countries[marker.cca3]?.name ?? marker.cca3}</strong>
+                    <br />
+                    Cyber reports: {marker.count}
+                  </Popup>
+                </CircleMarker>
+              ))
             : null}
 
           {corridorLines.map((line) => (
@@ -594,7 +644,7 @@ export function DangerMap() {
         </MapContainer>
       </div>
 
-      <ThreatScene3D activeRisk={activeRisk} density={interpolDots.length} />
+      <ThreatScene3D activeRisk={activeRisk} density={interpolDots.length + cyberMarkers.length} />
       <MapZoomControls mapRef={mapRef} onSoundToggle={toggleSound} soundEnabled={soundEnabled} />
       <LayerTogglePanel
         layers={layers}
@@ -607,6 +657,7 @@ export function DangerMap() {
         country={activeCountry}
         countryLookup={countries}
         disease={activeDisease}
+        cyberCount={activeCountryCode ? cyber.counts[activeCountryCode] ?? 0 : 0}
         interpolCount={activeCountryCode ? interpol.counts[activeCountryCode] ?? 0 : 0}
         onClose={() => {
           setHoveredCountry(undefined);
@@ -641,7 +692,7 @@ export function DangerMap() {
         />
       </DraggablePanel>
       <ThreatTicker
-        fbi={fbi}
+        cyber={cyber}
         interpol={interpol.notices}
         onClose={() => setTickerSelection(undefined)}
         onSelect={setTickerSelection}
@@ -663,7 +714,7 @@ export function DangerMap() {
           <p className="hud-title text-sm">{loadError ? "FEED ERROR" : "SYNCING FEEDS"}</p>
           <h1 className="mt-2 text-2xl font-semibold">{loadError ? "Unable to load command data" : "Building world risk layer"}</h1>
           <p className="mt-3 text-sm text-[#7a8da0]">
-            {loadError ?? "Fetching countries, disease, Interpol, and FBI feeds through cached route handlers."}
+            {loadError ?? "Fetching countries, disease, Interpol, and cyber feeds through cached route handlers."}
           </p>
         </section>
       ) : null}

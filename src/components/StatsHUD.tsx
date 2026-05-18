@@ -39,6 +39,7 @@ type StatsHUDProps = {
 
 export function StatsHUD({ stats, sourceNote }: StatsHUDProps) {
   const interpol = useCountUp(stats.interpolTotal);
+  const cyber = useCountUp(stats.cyberIncidents);
   const cases = useCountUp(stats.activeCases);
   const highRisk = useCountUp(stats.highRiskCountries);
 
@@ -60,6 +61,10 @@ export function StatsHUD({ stats, sourceNote }: StatsHUDProps) {
         <div className="stat-cell">
           <p className="stat-label">Interpol</p>
           <p className="stat-value">{formatCompactNumber(interpol)}</p>
+        </div>
+        <div className="stat-cell">
+          <p className="stat-label">Cyber</p>
+          <p className="stat-value text-[#00d4ff]">{formatCompactNumber(cyber)}</p>
         </div>
         <div className="stat-cell">
           <p className="stat-label">Active Cases</p>

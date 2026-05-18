@@ -1,7 +1,7 @@
 "use client";
 
 import type { ComponentType } from "react";
-import { Biohazard, Eye, Network, RadioTower, ShieldAlert, Skull, Users } from "lucide-react";
+import { Biohazard, Bug, Eye, Network, RadioTower, ShieldAlert, Users } from "lucide-react";
 
 import type { LayerKey, LayerState } from "@/types/risk";
 
@@ -11,7 +11,7 @@ const layerConfig: { key: LayerKey; label: string; icon: ComponentType<{ size?: 
   { key: "threat", label: "Threat Level", icon: ShieldAlert },
   { key: "disease", label: "Disease Spread", icon: Biohazard },
   { key: "interpol", label: "Interpol Notices", icon: RadioTower },
-  { key: "fbi", label: "FBI Overlay", icon: Skull },
+  { key: "cyber", label: "Cyber Attacks", icon: Bug },
   { key: "density", label: "Population Density", icon: Users },
   { key: "corridors", label: "Threat Corridors", icon: Network },
 ];

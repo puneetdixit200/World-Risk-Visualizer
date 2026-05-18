@@ -11,6 +11,10 @@ test("renders the command center map and interactive controls", async ({ page })
   await expect(page.locator(".country-path").first()).toBeVisible();
   await expect(page.getByLabel("Map zoom controls")).toBeVisible();
   await expect(page.locator(".threat-scene-canvas")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cyber Attacks" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "FBI Overlay" })).toHaveCount(0);
+  await expect(page.locator(".cyber-pulse").first()).toBeVisible();
+  await expect(page.locator(".ticker-source").filter({ hasText: "CYBER" }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Open Puneet Dixit's GitHub profile" })).toHaveAttribute(
     "href",
     "https://github.com/puneetdixit200",
@@ -63,6 +67,9 @@ test("renders the command center map and interactive controls", async ({ page })
 
   await page.getByRole("button", { name: "Disease Spread" }).click();
   await expect(page.locator(".disease-pulse")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Cyber Attacks" }).click();
+  await expect(page.locator(".cyber-pulse")).toHaveCount(0);
 
   await page.locator(".country-path").evaluateAll((paths) => {
     const target =

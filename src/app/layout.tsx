@@ -20,7 +20,7 @@ const shareTechMono = Share_Tech_Mono({
 
 export const metadata: Metadata = {
   title: "Danger Map | World Risk Visualizer",
-  description: "A full-screen command-center map visualizing global disease, notice, and country risk data.",
+  description: "A full-screen command-center map visualizing global disease, cyber, notice, and country risk data.",
 };
 
 export default function RootLayout({
