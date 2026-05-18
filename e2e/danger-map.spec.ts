@@ -11,10 +11,19 @@ test("renders the command center map and interactive controls", async ({ page })
   await expect(page.locator(".country-path").first()).toBeVisible();
   await expect(page.getByLabel("Map zoom controls")).toBeVisible();
   await expect(page.locator(".threat-scene-canvas")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open Puneet Dixit's GitHub profile" })).toHaveAttribute(
+    "href",
+    "https://github.com/puneetdixit200",
+  );
 
   const zoomBox = await page.getByLabel("Map zoom controls").boundingBox();
   expect(zoomBox?.x).toBeGreaterThan(420);
   expect(zoomBox?.x).toBeLessThan(760);
+
+  const githubBox = await page.getByRole("link", { name: "Open Puneet Dixit's GitHub profile" }).boundingBox();
+  const tickerBox = await page.locator(".ticker").boundingBox();
+  expect(githubBox?.x).toBeGreaterThan(1060);
+  expect(githubBox?.y).toBeLessThan((tickerBox?.y ?? 0) - 8);
 
   const beforeDrag = await page.getByLabel("Layer controls").boundingBox();
   await page.getByTestId("drag-layer-controls").dragTo(page.locator(".leaflet-container"), {

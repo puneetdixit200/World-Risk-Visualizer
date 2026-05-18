@@ -500,6 +500,37 @@ button {
   font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
 }
 
+.github-hud-link {
+  position: fixed;
+  right: 18px;
+  bottom: 62px;
+  z-index: 1265;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 255, 136, 0.18);
+  border-radius: 8px;
+  background: rgba(8, 12, 18, 0.9);
+  color: #d8e4ee;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 12px;
+  text-decoration: none;
+  backdrop-filter: blur(18px);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.36), 0 0 22px rgba(0, 255, 136, 0.08);
+  transition: color 180ms ease, border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.github-hud-link:hover,
+.github-hud-link:focus-visible {
+  color: var(--accent);
+  border-color: rgba(0, 255, 136, 0.52);
+  background: rgba(0, 255, 136, 0.09);
+  outline: none;
+  transform: translateY(-1px);
+}
+
 .ticker-modal {
   position: fixed;
   left: 50%;
@@ -709,5 +740,16 @@ button {
   .top-zoom-controls button {
     width: 34px;
     height: 32px;
+  }
+
+  .github-hud-link {
+    right: 10px;
+    bottom: 56px;
+    min-height: 34px;
+    padding: 8px;
+  }
+
+  .github-hud-link span {
+    display: none;
   }
 }
