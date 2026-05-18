@@ -3,16 +3,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import L, { type Layer, type LeafletMouseEvent, type PathOptions } from "leaflet";
-import { CircleMarker, GeoJSON, MapContainer, Polyline, Popup, TileLayer, ZoomControl } from "react-leaflet";
+import { CircleMarker, GeoJSON, MapContainer, Polyline, Popup, TileLayer } from "react-leaflet";
 import { feature } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import countries110m from "world-atlas/countries-110m.json";
 
 import { ComparisonPanel } from "@/components/ComparisonPanel";
 import { CRTOverlay } from "@/components/CRTOverlay";
+import { DraggablePanel } from "@/components/DraggablePanel";
 import { IntelCard } from "@/components/IntelCard";
 import { LayerTogglePanel } from "@/components/LayerTogglePanel";
+import { MapZoomControls } from "@/components/MapZoomControls";
 import { StatsHUD } from "@/components/StatsHUD";
+import { ThreatScene3D } from "@/components/ThreatScene3D";
 import { ThreatTicker } from "@/components/ThreatTicker";
 import {
   createDeterministicScatter,
@@ -105,27 +108,41 @@ function densityColor(density: number) {
   return "#101820";
 }
 
-function useAudioPing() {
+function useImmersiveAudio(activeRisk: number) {
   const audioRef = useRef<AudioContext | null>(null);
+  const humRef = useRef<OscillatorNode | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null);
+  const blipTimerRef = useRef<number | null>(null);
+  const [enabled, setEnabled] = useState(false);
 
-  return useCallback((risk: number) => {
+  const ensureContext = useCallback(() => {
     const AudioContextCtor =
       window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 
     if (!AudioContextCtor) {
+      return null;
+    }
+
+    const context = audioRef.current ?? new AudioContextCtor();
+    audioRef.current = context;
+    void context.resume();
+
+    return context;
+  }, []);
+
+  const playPing = useCallback((risk: number) => {
+    const context = ensureContext();
+
+    if (!context) {
       return;
     }
 
     try {
-      const context = audioRef.current ?? new AudioContextCtor();
-      audioRef.current = context;
-      void context.resume();
-
       const oscillator = context.createOscillator();
       const gain = context.createGain();
       oscillator.type = risk >= 80 ? "sawtooth" : "sine";
       oscillator.frequency.value = risk >= 80 ? 520 : 1200;
-      gain.gain.value = risk >= 80 ? 0.035 : 0.018;
+      gain.gain.value = enabled ? (risk >= 80 ? 0.045 : 0.022) : 0.012;
       oscillator.connect(gain);
       gain.connect(context.destination);
       oscillator.start();
@@ -133,7 +150,80 @@ function useAudioPing() {
     } catch {
       // Browser autoplay policy can block this before a user gesture.
     }
+  }, [enabled, ensureContext]);
+
+  const stopSoundscape = useCallback(() => {
+    if (blipTimerRef.current) {
+      window.clearInterval(blipTimerRef.current);
+      blipTimerRef.current = null;
+    }
+
+    humRef.current?.stop();
+    humRef.current?.disconnect();
+    humRef.current = null;
+    masterGainRef.current?.disconnect();
+    masterGainRef.current = null;
+    setEnabled(false);
   }, []);
+
+  const startSoundscape = useCallback(() => {
+    const context = ensureContext();
+
+    if (!context || humRef.current) {
+      setEnabled(Boolean(context));
+      return;
+    }
+
+    const masterGain = context.createGain();
+    const filter = context.createBiquadFilter();
+    const hum = context.createOscillator();
+    masterGain.gain.value = 0.018;
+    filter.type = "lowpass";
+    filter.frequency.value = 240;
+    hum.type = "sawtooth";
+    hum.frequency.value = 48;
+    hum.connect(filter);
+    filter.connect(masterGain);
+    masterGain.connect(context.destination);
+    hum.start();
+    humRef.current = hum;
+    masterGainRef.current = masterGain;
+    setEnabled(true);
+
+    blipTimerRef.current = window.setInterval(() => {
+      const risk = activeRisk || 35;
+      playPing(risk);
+    }, 2300);
+  }, [activeRisk, ensureContext, playPing]);
+
+  const toggleSound = useCallback(() => {
+    if (enabled) {
+      stopSoundscape();
+    } else {
+      startSoundscape();
+    }
+  }, [enabled, startSoundscape, stopSoundscape]);
+
+  useEffect(() => {
+    const startOnGesture = () => startSoundscape();
+    window.addEventListener("pointerdown", startOnGesture, { once: true });
+
+    return () => window.removeEventListener("pointerdown", startOnGesture);
+  }, [startSoundscape]);
+
+  useEffect(() => {
+    if (humRef.current) {
+      humRef.current.frequency.setTargetAtTime(42 + activeRisk * 0.38, audioRef.current?.currentTime ?? 0, 0.08);
+    }
+
+    if (masterGainRef.current) {
+      masterGainRef.current.gain.setTargetAtTime(0.012 + activeRisk / 4500, audioRef.current?.currentTime ?? 0, 0.12);
+    }
+  }, [activeRisk]);
+
+  useEffect(() => stopSoundscape, [stopSoundscape]);
+
+  return { enabled, playPing, toggleSound };
 }
 
 export function DangerMap() {
@@ -158,11 +248,18 @@ export function DangerMap() {
   const [tickerSelection, setTickerSelection] = useState<TickerSelection>();
   const [loadError, setLoadError] = useState<string | undefined>();
   const mapRef = useRef<L.Map | null>(null);
-  const playPing = useAudioPing();
 
   const worldFeatures = useMemo(() => {
     const topology = countries110m as WorldTopology;
-    return feature(topology, topology.objects.countries) as FeatureCollection<Geometry, { name?: string }>;
+    const collection = feature(topology, topology.objects.countries) as FeatureCollection<Geometry, { name?: string }>;
+
+    return {
+      ...collection,
+      features: collection.features.filter((countryFeature) => {
+        const id = String(countryFeature.id).padStart(3, "0");
+        return id !== "010" && id !== "242";
+      }),
+    };
   }, []);
 
   useEffect(() => {
@@ -226,6 +323,7 @@ export function DangerMap() {
   const activeRisk = activeCountryCode ? riskScores[activeCountryCode] ?? 0 : 0;
   const activeDisease = activeCountryCode ? disease[activeCountryCode] : undefined;
   const comparisonCountries = compareCodes.map((code) => countries[code]).filter(Boolean);
+  const { enabled: soundEnabled, playPing, toggleSound } = useImmersiveAudio(activeRisk);
 
   const globalStats = useMemo(() => {
     const activeCases = Object.values(disease).reduce((sum, record) => sum + record.active, 0);
@@ -252,15 +350,15 @@ export function DangerMap() {
           : "#071017";
 
       return {
-        color: activeCountryCode === featureCountry?.cca3 ? "#00ff88" : "rgba(0,255,136,0.18)",
-        weight: activeCountryCode === featureCountry?.cca3 ? 1.7 : 0.7,
+        color: "rgba(0,255,136,0.18)",
+        weight: 0.7,
         opacity: 0.95,
         fillColor,
         fillOpacity: layers.threat || layers.density ? 0.55 : 0.08,
         className: `country-path ${score >= 75 ? "critical-country" : ""}`,
       };
     },
-    [activeCountryCode, countries, countriesByNumeric, layers.density, layers.threat, riskScores],
+    [countries, countriesByNumeric, layers.density, layers.threat, riskScores],
   );
 
   const registerCountryEvents = useCallback(
@@ -330,7 +428,9 @@ export function DangerMap() {
           record,
           value: getDiseaseValueAtIndex(record, timeIndex),
         }))
-        .filter(({ record, value }) => value > 0 && Number.isFinite(record.lat) && Number.isFinite(record.lng)),
+        .filter(({ record, value }) => value > 0 && Number.isFinite(record.lat) && Number.isFinite(record.lng))
+        .sort((left, right) => right.value - left.value)
+        .slice(0, 90),
     [disease, timeIndex],
   );
 
@@ -343,19 +443,19 @@ export function DangerMap() {
           return [];
         }
 
-        return createDeterministicScatter(country.center, cca3, Math.min(count, 14)).map((point, index) => ({
+        return createDeterministicScatter(country.center, cca3, Math.min(count, 6)).map((point, index) => ({
           id: `${cca3}-${index}`,
           cca3,
           count,
           point,
         }));
-      }),
+      }).slice(0, 280),
     [countries, interpol.counts],
   );
 
   const fbiMarkers = useMemo(
     () =>
-      createDeterministicScatter([-98, 39], "FBI-MOST-WANTED", Math.min(fbi.length, 14)).map((point, index) => ({
+      createDeterministicScatter([-98, 39], "FBI-MOST-WANTED", Math.min(fbi.length, 10)).map((point, index) => ({
         point,
         entry: fbi[index],
       })),
@@ -399,10 +499,9 @@ export function DangerMap() {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           />
-          <ZoomControl position="bottomright" />
           {hasData ? (
             <GeoJSON
-              key={`${layers.threat}-${layers.density}-${activeCountryCode ?? "none"}-${Object.keys(countries).length}`}
+              key={`${layers.threat}-${layers.density}-${Object.keys(countries).length}`}
               data={worldFeatures}
               style={countryStyle}
               onEachFeature={registerCountryEvents}
@@ -499,6 +598,8 @@ export function DangerMap() {
         </MapContainer>
       </div>
 
+      <ThreatScene3D activeRisk={activeRisk} density={interpolDots.length} />
+      <MapZoomControls mapRef={mapRef} onSoundToggle={toggleSound} soundEnabled={soundEnabled} />
       <LayerTogglePanel
         layers={layers}
         nightVision={nightVision}
@@ -523,7 +624,13 @@ export function DangerMap() {
         onClose={() => setCompareCodes([])}
         riskScores={riskScores}
       />
-      <div className="time-scrubber" aria-label="Disease timeline control">
+      <DraggablePanel
+        ariaLabel="Disease timeline control"
+        className="time-scrubber"
+        initialPosition={{ x: 380, y: 610 }}
+        panelId="disease-timeline"
+        role="region"
+      >
         <div className="mb-1 flex items-center justify-between gap-3">
           <p className="hud-title text-xs">DISEASE TIME SLIDER</p>
           <p className="data-font text-[10px] uppercase text-[#7a8da0]">Day {timeIndex + 1}/30</p>
@@ -536,7 +643,7 @@ export function DangerMap() {
           type="range"
           value={timeIndex}
         />
-      </div>
+      </DraggablePanel>
       <ThreatTicker
         fbi={fbi}
         interpol={interpol.notices}

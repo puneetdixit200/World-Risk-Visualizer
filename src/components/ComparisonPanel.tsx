@@ -6,6 +6,8 @@ import { formatCompactNumber } from "@/lib/geoUtils";
 import { getRiskColor } from "@/lib/riskCalculator";
 import type { CountryIntel } from "@/types/risk";
 
+import { DraggablePanel } from "./DraggablePanel";
+
 type ComparisonPanelProps = {
   countries: CountryIntel[];
   riskScores: Record<string, number>;
@@ -18,7 +20,12 @@ export function ComparisonPanel({ countries, riskScores, onClose }: ComparisonPa
   }
 
   return (
-    <section className="comparison-panel" aria-label="Country comparison">
+    <DraggablePanel
+      ariaLabel="Country comparison"
+      className="comparison-panel"
+      initialPosition={{ x: 330, y: 74 }}
+      panelId="country-comparison"
+    >
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="hud-title text-xs">COMPARISON MODE</p>
@@ -51,6 +58,6 @@ export function ComparisonPanel({ countries, riskScores, onClose }: ComparisonPa
           );
         })}
       </div>
-    </section>
+    </DraggablePanel>
   );
 }

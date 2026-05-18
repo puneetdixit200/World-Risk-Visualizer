@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { formatCompactNumber } from "@/lib/geoUtils";
 import type { GlobalStats } from "@/types/risk";
 
+import { DraggablePanel } from "./DraggablePanel";
+
 function useCountUp(value: number) {
   const [displayValue, setDisplayValue] = useState(0);
 
@@ -41,7 +43,12 @@ export function StatsHUD({ stats, sourceNote }: StatsHUDProps) {
   const highRisk = useCountUp(stats.highRiskCountries);
 
   return (
-    <section className="hud-panel stats-panel" aria-label="Global risk stats">
+    <DraggablePanel
+      ariaLabel="Global risk stats"
+      className="hud-panel stats-panel"
+      initialPosition={{ x: 950, y: 18 }}
+      panelId="global-risk-stats"
+    >
       <div className="defcon">
         <div>
           <p className="hud-title text-sm">GLOBAL DEFCON</p>
@@ -67,6 +74,6 @@ export function StatsHUD({ stats, sourceNote }: StatsHUDProps) {
           <p className="stat-value">{stats.defcon <= 2 ? "RED" : "WATCH"}</p>
         </div>
       </div>
-    </section>
+    </DraggablePanel>
   );
 }

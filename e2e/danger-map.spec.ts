@@ -9,6 +9,45 @@ test("renders the command center map and interactive controls", async ({ page })
   await expect(page.locator(".leaflet-container")).toBeVisible();
   await expect(page.locator(".ticker")).toBeVisible();
   await expect(page.locator(".country-path").first()).toBeVisible();
+  await expect(page.getByLabel("Map zoom controls")).toBeVisible();
+  await expect(page.locator(".threat-scene-canvas")).toBeVisible();
+
+  const zoomBox = await page.getByLabel("Map zoom controls").boundingBox();
+  expect(zoomBox?.x).toBeGreaterThan(420);
+  expect(zoomBox?.x).toBeLessThan(760);
+
+  const beforeDrag = await page.getByLabel("Layer controls").boundingBox();
+  await page.getByTestId("drag-layer-controls").dragTo(page.locator(".leaflet-container"), {
+    targetPosition: { x: 420, y: 180 },
+  });
+  const afterDrag = await page.getByLabel("Layer controls").boundingBox();
+  expect(afterDrag?.x).toBeGreaterThan((beforeDrag?.x ?? 0) + 120);
+  expect(afterDrag?.y).toBeGreaterThan((beforeDrag?.y ?? 0) + 60);
+
+  const longHorizontalSlivers = await page.locator(".country-path").evaluateAll((paths) =>
+    paths.filter((path) => {
+      const box = path.getBoundingClientRect();
+      return box.width > window.innerWidth * 0.7 && box.height < 12;
+    }).length,
+  );
+  expect(longHorizontalSlivers).toBe(0);
+
+  const has3DPixels = await page.locator(".threat-scene-canvas").evaluate((canvas) => {
+    const element = canvas as HTMLCanvasElement;
+    const gl = element.getContext("webgl2", { preserveDrawingBuffer: true }) ?? element.getContext("webgl", { preserveDrawingBuffer: true });
+    if (!gl || element.width === 0 || element.height === 0) {
+      return false;
+    }
+    const pixels = new Uint8Array(element.width * element.height * 4);
+    gl.readPixels(0, 0, element.width, element.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    for (let index = 3; index < pixels.length; index += 24) {
+      if (pixels[index] > 0) {
+        return true;
+      }
+    }
+    return false;
+  });
+  expect(has3DPixels).toBe(true);
 
   await page.getByLabel("Toggle night vision").click();
   await expect(page.locator("main.danger-shell")).toHaveClass(/night-vision/);

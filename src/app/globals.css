@@ -79,6 +79,16 @@ button {
   transition: transform 900ms ease, filter 600ms ease;
 }
 
+.threat-scene-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  opacity: 0.92;
+}
+
 .map-stage.satellite-drop {
   transform: perspective(900px) rotateX(3deg) scale(1.03);
   filter: contrast(1.2) brightness(1.12);
@@ -94,17 +104,6 @@ button {
 .leaflet-container {
   font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   background: #05070a;
-}
-
-.leaflet-control-zoom {
-  border: 1px solid rgba(0, 255, 136, 0.16) !important;
-  background: rgba(5, 8, 12, 0.86) !important;
-}
-
-.leaflet-control-zoom a {
-  background: rgba(5, 8, 12, 0.86) !important;
-  color: var(--accent) !important;
-  border-color: rgba(0, 255, 136, 0.12) !important;
 }
 
 .leaflet-popup-content-wrapper,
@@ -157,6 +156,80 @@ button {
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
 }
 
+.movable-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  will-change: transform;
+  user-select: none;
+}
+
+.movable-panel.dragging {
+  cursor: grabbing;
+  transition: none;
+}
+
+.dashboard-hidden {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.drag-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 18px;
+  margin: -5px 0 8px;
+  border: 0;
+  border-bottom: 1px solid rgba(0, 255, 136, 0.08);
+  background: transparent;
+  color: rgba(0, 255, 136, 0.42);
+  cursor: grab;
+}
+
+.drag-strip:active {
+  cursor: grabbing;
+}
+
+.top-zoom-controls {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 1250;
+  display: grid;
+  grid-template-columns: repeat(3, 38px);
+  gap: 8px;
+  transform: translateX(-50%);
+  padding: 8px;
+  border: 1px solid rgba(0, 255, 136, 0.16);
+  border-radius: 8px;
+  background: rgba(8, 12, 18, 0.86);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.34);
+}
+
+.top-zoom-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 34px;
+  border: 1px solid rgba(122, 141, 160, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #d8e4ee;
+  transition: color 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.top-zoom-controls button:hover,
+.top-zoom-controls button.active {
+  color: var(--accent);
+  border-color: rgba(0, 255, 136, 0.42);
+  background: rgba(0, 255, 136, 0.1);
+}
+
 .hud-title {
   font-family: var(--font-share-tech-mono), ui-monospace, monospace;
   color: var(--accent);
@@ -167,9 +240,6 @@ button {
 }
 
 .layer-panel {
-  position: fixed;
-  top: 18px;
-  left: 18px;
   z-index: 1200;
   width: min(292px, calc(100vw - 36px));
   padding: 14px;
@@ -228,9 +298,6 @@ button {
 }
 
 .stats-panel {
-  position: fixed;
-  top: 18px;
-  right: 18px;
   z-index: 1200;
   width: min(320px, calc(100vw - 36px));
   padding: 14px;
@@ -282,21 +349,17 @@ button {
 }
 
 .intel-card {
-  position: fixed;
-  top: 112px;
-  right: 18px;
   z-index: 1220;
   width: min(392px, calc(100vw - 36px));
   max-height: calc(100vh - 180px);
   overflow: auto;
   padding: 16px;
   border-radius: 8px;
-  transform: translateX(calc(100% + 28px));
-  transition: transform 420ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  transition: opacity 220ms ease, visibility 220ms ease;
 }
 
 .intel-card.open {
-  transform: translateX(0);
+  opacity: 1;
 }
 
 .intel-card::after {
@@ -458,14 +521,10 @@ button {
 }
 
 .comparison-panel {
-  position: fixed;
-  left: 50%;
-  top: 74px;
   z-index: 1210;
   width: min(620px, calc(100vw - 36px));
   padding: 14px;
   border-radius: 8px;
-  transform: translateX(-50%);
 }
 
 .comparison-grid {
@@ -475,14 +534,10 @@ button {
 }
 
 .time-scrubber {
-  position: fixed;
-  left: 50%;
-  bottom: 62px;
   z-index: 1200;
   width: min(520px, calc(100vw - 36px));
   padding: 10px 12px;
   border-radius: 8px;
-  transform: translateX(-50%);
 }
 
 .time-scrubber input {
@@ -597,9 +652,14 @@ button {
 }
 
 @media (max-width: 768px) {
+  .movable-panel {
+    top: 0;
+    right: auto;
+    bottom: auto;
+    left: 0;
+  }
+
   .layer-panel {
-    top: 12px;
-    left: 12px;
     width: 232px;
     padding: 10px;
   }
@@ -609,8 +669,6 @@ button {
   }
 
   .stats-panel {
-    top: 12px;
-    right: 12px;
     width: 174px;
     padding: 10px;
   }
@@ -629,30 +687,27 @@ button {
   }
 
   .intel-card {
-    top: auto;
-    right: 0;
-    left: 0;
-    bottom: 46px;
-    width: 100%;
+    width: min(392px, calc(100vw - 20px));
     max-height: 58vh;
-    border-radius: 8px 8px 0 0;
-    transform: translateY(calc(100% + 24px));
-  }
-
-  .intel-card.open {
-    transform: translateY(0);
+    border-radius: 8px;
   }
 
   .comparison-panel {
-    top: auto;
-    bottom: 118px;
+    width: min(620px, calc(100vw - 20px));
   }
 
   .comparison-grid {
     grid-template-columns: 1fr;
   }
 
-  .time-scrubber {
-    bottom: 54px;
+  .top-zoom-controls {
+    top: 10px;
+    grid-template-columns: repeat(3, 34px);
+    padding: 6px;
+  }
+
+  .top-zoom-controls button {
+    width: 34px;
+    height: 32px;
   }
 }

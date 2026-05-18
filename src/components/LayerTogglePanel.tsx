@@ -5,6 +5,8 @@ import { Biohazard, Eye, Network, RadioTower, ShieldAlert, Skull, Users } from "
 
 import type { LayerKey, LayerState } from "@/types/risk";
 
+import { DraggablePanel } from "./DraggablePanel";
+
 const layerConfig: { key: LayerKey; label: string; icon: ComponentType<{ size?: number }> }[] = [
   { key: "threat", label: "Threat Level", icon: ShieldAlert },
   { key: "disease", label: "Disease Spread", icon: Biohazard },
@@ -23,7 +25,12 @@ type LayerTogglePanelProps = {
 
 export function LayerTogglePanel({ layers, nightVision, onToggle, onNightVisionToggle }: LayerTogglePanelProps) {
   return (
-    <section className="hud-panel layer-panel" aria-label="Layer controls">
+    <DraggablePanel
+      ariaLabel="Layer controls"
+      className="hud-panel layer-panel"
+      initialPosition={{ x: 18, y: 18 }}
+      panelId="layer-controls"
+    >
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="hud-title text-sm">DANGER MAP</p>
@@ -49,6 +56,6 @@ export function LayerTogglePanel({ layers, nightVision, onToggle, onNightVisionT
           </span>
         </button>
       ))}
-    </section>
+    </DraggablePanel>
   );
 }
